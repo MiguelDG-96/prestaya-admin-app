@@ -58,7 +58,7 @@ import { LucideAngularModule, Lock, Mail, Eye, EyeOff, CircleDollarSign, ArrowRi
               </div>
             </div>
 
-            <div class="flex items-center justify-between px-2">
+            <div class="flex items-center px-2">
               <label class="flex items-center gap-3 cursor-pointer group/check">
                 <div class="relative flex items-center">
                   <input type="checkbox" formControlName="rememberMe" class="peer h-5 w-5 appearance-none rounded-lg border-2 border-white/10 bg-white/5 transition-all checked:bg-[#7B61FF] checked:border-[#7B61FF] focus:outline-none">
@@ -66,7 +66,6 @@ import { LucideAngularModule, Lock, Mail, Eye, EyeOff, CircleDollarSign, ArrowRi
                 </div>
                 <span class="text-[9px] font-black text-white/30 group-hover/check:text-white/60 uppercase tracking-widest transition-colors">Recordar sesión</span>
               </label>
-              <a href="#" class="text-[9px] font-black text-[#7B61FF] hover:text-[#6349E6] uppercase tracking-widest transition-colors">Recuperar clave</a>
             </div>
 
             <button type="submit" [disabled]="loginForm.invalid || isLoading()" class="w-full relative group/btn overflow-hidden rounded-2xl transition-all active:scale-95">
