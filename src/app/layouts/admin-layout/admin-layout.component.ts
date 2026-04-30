@@ -14,7 +14,9 @@ import {
   X,
   ChevronRight,
   Bell,
-  Home
+  Home,
+  Loader2,
+  Save
 } from 'lucide-angular';
 import { NotificationService } from '../../core/services/notification.service';
 import { NotificationDrawerComponent } from './notification-drawer/notification-drawer.component';
@@ -125,7 +127,6 @@ import { NotificationDrawerComponent } from './notification-drawer/notification-
             <button (click)="toggleSidebar()" class="p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-100 transition-all border border-slate-100">
               <lucide-icon [name]="isMobile() ? (isMobileMenuOpen() ? 'x' : 'menu') : 'menu'" class="w-5 h-5"></lucide-icon>
             </button>
-            <h2 class="text-lg font-black text-slate-900 hidden sm:block tracking-tight">Panel Administrativo</h2>
           </div>
 
           <div class="flex items-center gap-3">
@@ -159,6 +160,29 @@ import { NotificationDrawerComponent } from './notification-drawer/notification-
         [open]="isNotificationDrawerOpen()"
         (close)="isNotificationDrawerOpen.set(false)"
       ></app-notification-drawer>
+
+      <!-- Logout Animation Overlay -->
+      <div 
+        *ngIf="isLoggingOut()" 
+        class="fixed inset-0 bg-[#06050C]/80 backdrop-blur-2xl z-[100] flex flex-col items-center justify-center animate-in fade-in duration-500"
+      >
+        <div class="relative">
+          <div class="absolute inset-0 rounded-full bg-[#7B61FF]/20 animate-ping"></div>
+          <div class="relative w-24 h-24 bg-white/5 backdrop-blur-xl rounded-[2.5rem] border border-white/10 flex items-center justify-center shadow-2xl shadow-[#7B61FF]/20">
+            <lucide-icon name="loader-2" class="w-10 h-10 text-[#7B61FF] animate-spin"></lucide-icon>
+          </div>
+        </div>
+        
+        <div class="mt-12 text-center space-y-4">
+          <h3 class="text-2xl font-semibold text-white tracking-tight animate-pulse">Cerrando sesión</h3>
+          <div class="flex items-center gap-3 bg-white/5 backdrop-blur-xl px-6 py-3 rounded-2xl border border-white/10">
+            <div class="w-6 h-6 bg-[#7B61FF]/20 rounded-lg flex items-center justify-center">
+              <lucide-icon name="save" class="w-3.5 h-3.5 text-[#7B61FF]"></lucide-icon>
+            </div>
+            <span class="text-xs font-medium text-white/50">Sincronizando y guardando datos...</span>
+          </div>
+        </div>
+      </div>
     </div>
   `,
   styles: [`
@@ -185,6 +209,8 @@ export class AdminLayoutComponent implements OnInit {
     { label: 'Alquileres', icon: 'home', link: '/rentals', authority: 'RENTALS_VIEW' },
     { label: 'Inquilinos', icon: 'users', link: '/tenants', authority: 'TENANTS_VIEW' }
   ];
+
+  isLoggingOut = signal(false);
 
   ngOnInit() {
     this.notificationService.loadNotifications().subscribe();
@@ -215,6 +241,10 @@ export class AdminLayoutComponent implements OnInit {
   }
 
   logout() {
-    this.authService.logout();
+    this.isLoggingOut.set(true);
+    // Simulate saving data for a smoother experience
+    setTimeout(() => {
+      this.authService.logout();
+    }, 1800);
   }
 }
