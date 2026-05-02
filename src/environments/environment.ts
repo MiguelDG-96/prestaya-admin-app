@@ -1,4 +1,4 @@
 export const environment = {
   production: false,
-  apiUrl: 'https://servicio.teamrecios.com/api',
+  apiUrl: '/api', // Usa el proxy local para evitar errores de CORS
 };
