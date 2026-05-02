@@ -164,7 +164,11 @@ import { FormsModule } from '@angular/forms';
                       {{ inst.number }}
                     </div>
                     <div>
-                      <p class="text-[8px] font-black uppercase mb-1 tracking-widest" [class]="inst.isPaid ? 'text-emerald-600' : 'text-slate-400'">Cuota nº {{ inst.number }}</p>
+                      <div class="flex items-center gap-2 mb-1">
+                        <p class="text-[8px] font-black uppercase tracking-widest" [class]="inst.isPaid ? 'text-emerald-600' : 'text-slate-400'">Cuota nº {{ inst.number }}</p>
+                        <span *ngIf="!inst.isPaid" class="bg-amber-50 text-amber-600 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider border border-amber-200/60 leading-none">Pendiente</span>
+                        <span *ngIf="inst.isPaid" class="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider border border-emerald-200/60 leading-none">Pagado</span>
+                      </div>
                       <p class="font-black text-slate-900 text-sm tracking-tight">{{ inst.dueDate | date:'dd MMMM, yyyy' }}</p>
                     </div>
                   </div>
@@ -250,24 +254,54 @@ import { FormsModule } from '@angular/forms';
       <!-- Payment Modal -->
       <div *ngIf="showPaymentModal()" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" (click)="showPaymentModal.set(false)"></div>
-        <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-sm p-8 relative z-10 animate-in zoom-in-95 duration-300">
+        <div class="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm p-8 relative z-10 animate-in zoom-in-95 duration-300">
           <div class="mb-6 text-center">
             <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-emerald-100 shadow-sm">
               <lucide-icon name="wallet" class="w-8 h-8"></lucide-icon>
             </div>
             <h3 class="text-xl font-black text-slate-900 tracking-tight">Cobrar Cuota</h3>
-            <p class="text-[10px] text-slate-500 font-medium uppercase tracking-widest mt-1">Cuota nº {{ selectedInstallment()?.number }} - {{ loan()?.clientName }}</p>
+            <p class="text-[10px] text-slate-500 font-medium uppercase tracking-widest mt-1">Cuota nº {{ selectedInstallment()?.number }} - {{ loan()?.clientName || loan()?.client?.name }}</p>
           </div>
           
           <div class="bg-slate-50 p-6 rounded-2xl mb-6 border border-slate-100 text-center">
-            <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Monto de la Cuota</p>
+            <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Monto Sugerido</p>
             <p class="text-3xl font-black text-slate-900 tracking-tighter">S/ {{ selectedInstallment()?.amount | number:'1.2-2' }}</p>
+          </div>
+
+          <div class="space-y-4 mb-6">
+            <div>
+              <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Monto a Pagar</label>
+              <div class="relative group">
+                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <span class="font-black text-slate-400 text-xs">S/</span>
+                </div>
+                <input 
+                  type="number" 
+                  [ngModel]="paymentAmount()" 
+                  (ngModelChange)="paymentAmount.set($event)"
+                  name="paymentAmount"
+                  required
+                  class="w-full bg-slate-50 border border-slate-100 rounded-xl pl-10 pr-4 py-3 font-black text-slate-900 outline-none focus:border-emerald-600 focus:bg-white transition-all text-sm"
+                >
+              </div>
+            </div>
+
+            <!-- Alerta de abono parcial -->
+            <div *ngIf="paymentAmount() < selectedInstallment()?.amount && paymentAmount() > 0" class="bg-amber-50 border border-amber-100 p-4 rounded-xl space-y-1">
+              <p class="text-[9px] font-black text-amber-600 uppercase tracking-tight flex items-center gap-1">
+                <lucide-icon name="info" class="w-3 h-3"></lucide-icon>
+                Abono Parcial
+              </p>
+              <p class="text-[10px] text-amber-700 font-medium leading-normal">
+                El cliente pagará un monto menor al total de la cuota. El pago se registrará, pero no se marcará como pagada hasta completar el total.
+              </p>
+            </div>
           </div>
 
           <div class="space-y-5">
             <div class="flex gap-3">
               <button (click)="showPaymentModal.set(false)" class="flex-1 py-4 font-black text-slate-400 hover:text-slate-900 transition-all text-xs">Cancelar</button>
-              <button (click)="confirmPayment()" [disabled]="isSaving()" class="flex-[1.5] bg-emerald-600 text-white py-4 rounded-xl font-black hover:bg-slate-900 transition-all flex items-center justify-center gap-2 shadow-lg text-xs uppercase shadow-emerald-100">
+              <button (click)="confirmPayment()" [disabled]="isSaving() || paymentAmount() <= 0" class="flex-[1.5] bg-emerald-600 text-white py-4 rounded-xl font-black hover:bg-slate-900 transition-all flex items-center justify-center gap-2 shadow-lg text-xs uppercase shadow-emerald-100">
                 <lucide-icon *ngIf="isSaving()" name="loader-2" class="w-4 h-4 animate-spin"></lucide-icon>
                 {{ isSaving() ? 'Cobrando...' : 'Confirmar Cobro' }}
               </button>
@@ -313,6 +347,7 @@ export class LoanDetailComponent implements OnInit {
   isSaving = signal(false);
   isDeleting = signal(false);
   selectedInstallment = signal<any>(null);
+  paymentAmount = signal<number>(0);
 
   progress = computed(() => {
     const l = this.loan();
@@ -322,18 +357,21 @@ export class LoanDetailComponent implements OnInit {
 
   installmentSchedule = computed(() => {
     const l = this.loan();
-    if (!l) return [];
+    if (!l || !l.startDate) return [];
     const schedule = [];
-    const start = new Date(l.startDate);
+    
+    // Convertir de forma segura para evitar problemas de zona horaria (UTC vs Local)
+    const parts = l.startDate.split('T')[0].split('-');
+    const start = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
     const amountPerInstallment = l.totalToPay / l.totalInstallments;
     
     for (let i = 1; i <= l.totalInstallments; i++) {
       const dueDate = new Date(start);
-      // Simplify date calculation based on frequency
+      // Calcular la fecha basándose en la frecuencia
       const freq = l.paymentFrequency || l.frequency;
       if (freq === 'DAILY') dueDate.setDate(start.getDate() + i);
       else if (freq === 'WEEKLY') dueDate.setDate(start.getDate() + (i * 7));
-      else if (freq === 'BIWEEKLY') dueDate.setDate(start.getDate() + (i * 15));
+      else if (freq === 'BIWEEKLY') dueDate.setDate(start.getDate() + (i * 14));
       else dueDate.setMonth(start.getMonth() + i);
 
       schedule.push({
@@ -354,16 +392,14 @@ export class LoanDetailComponent implements OnInit {
   }
 
   loadLoan(id: string) {
-    const found = this.loanService.loans().find(l => l.id === id);
-    if (found) {
-      this.loan.set(found);
-    } else {
-      this.loanService.loadLoans().subscribe(loans => {
-        const l = loans.find(x => x.id === id);
-        if (l) this.loan.set(l);
-        else this.router.navigate(['/loans']);
-      });
-    }
+    this.loanService.loadLoans().subscribe(loans => {
+      const l = loans.find(x => x.id === id);
+      if (l) {
+        this.loan.set(l);
+      } else {
+        this.router.navigate(['/loans']);
+      }
+    });
   }
 
   editLoan() {
@@ -373,17 +409,34 @@ export class LoanDetailComponent implements OnInit {
 
   openPaymentModal(inst: any) {
     this.selectedInstallment.set(inst);
+    // Calcular monto faltante para completar esta cuota basándonos en amountPaid
+    const total = this.loan()?.totalToPay || 0;
+    const totalInstallments = this.loan()?.totalInstallments || 1;
+    const installmentAmount = total / totalInstallments;
+    
+    const completedInstallments = this.loan()?.paidInstallments || 0;
+    const expectedPaidForCompleted = completedInstallments * installmentAmount;
+    const accumulatedForNext = (this.loan()?.amountPaid || 0) - expectedPaidForCompleted;
+    
+    // Si ya hay un abono parcial previo, le restamos lo que ya tiene
+    let toPay = installmentAmount;
+    if (accumulatedForNext > 0 && inst.number === completedInstallments + 1) {
+      toPay = installmentAmount - accumulatedForNext;
+    }
+
+    // Asegurarnos de redondear a 2 decimales para evitar problemas de precisión
+    this.paymentAmount.set(Math.max(0, parseFloat(toPay.toFixed(2))));
     this.showPaymentModal.set(true);
   }
 
   confirmPayment() {
     const l = this.loan();
     if (!l) return;
+    if (this.paymentAmount() <= 0) return;
     this.isSaving.set(true);
-    const amountPerInst = l.totalToPay / l.totalInstallments;
     this.loanService.registerPayment({
       loanId: l.id,
-      amount: amountPerInst,
+      amount: this.paymentAmount(),
       note: `Pago de cuota ${this.selectedInstallment()?.number}`
     }).subscribe({
       next: () => {

@@ -214,7 +214,7 @@ import { LoanCreateRequest } from '../../../core/models/loan.model';
                 </div>
 
                 <div class="group">
-                  <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Fecha de Inicio</label>
+                  <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Fecha del Primer Pago</label>
                   <input 
                     type="date" 
                     [(ngModel)]="loan.startDate" 
