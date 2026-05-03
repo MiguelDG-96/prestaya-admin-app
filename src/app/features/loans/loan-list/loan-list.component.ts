@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, computed } from '@angular/core';
+import { Component, inject, signal, OnInit, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { 
@@ -9,6 +9,7 @@ import {
   Calendar, 
   TrendingUp, 
   Clock,
+  ChevronLeft,
   ChevronRight,
   MoreHorizontal,
   Wallet,
@@ -63,6 +64,25 @@ import { RouterModule } from '@angular/router';
               placeholder="Buscar por cliente o ID..." 
               class="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-11 pr-4 py-3.5 font-bold text-slate-900 focus:ring-4 focus:ring-[#7B61FF]/10 focus:border-[#7B61FF] focus:bg-white transition-all outline-none text-[11px] shadow-sm"
             >
+          </div>
+          <div class="relative min-w-[180px] group">
+            <select 
+              [ngModel]="selectedDay()"
+              (ngModelChange)="selectedDay.set($event)"
+              class="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-4 pr-10 py-3.5 font-bold text-slate-900 focus:ring-4 focus:ring-[#7B61FF]/10 focus:border-[#7B61FF] focus:bg-white transition-all outline-none text-[11px] shadow-sm appearance-none"
+            >
+              <option value="">Todos los días</option>
+              <option value="1">Lunes</option>
+              <option value="2">Martes</option>
+              <option value="3">Miércoles</option>
+              <option value="4">Jueves</option>
+              <option value="5">Viernes</option>
+              <option value="6">Sábado</option>
+              <option value="0">Domingo</option>
+            </select>
+            <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+              <lucide-icon name="calendar" class="w-4 h-4 text-slate-400"></lucide-icon>
+            </div>
           </div>
           <div class="flex items-center gap-3">
             <button 
@@ -473,6 +493,7 @@ export class LoanListComponent implements OnInit {
   authService = inject(AuthService);
   
   searchTerm = signal('');
+  selectedDay = signal('');
   showCreateModal = signal(false);
   showPaymentModal = signal(false);
   showSimulationModal = signal(false);
@@ -492,7 +513,7 @@ export class LoanListComponent implements OnInit {
   interestRate = signal(20);
   totalInstallments = signal(24);
   startDate = signal(new Date().toISOString().split('T')[0]);
-  paymentFrequency = signal<'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY'>('DAILY');
+  paymentFrequency = signal<'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'BIWEEK' | 'MONTHLY'>('DAILY');
 
   totalToPay = computed(() => {
     const amt = this.amount() || 0;
@@ -525,11 +546,9 @@ export class LoanListComponent implements OnInit {
   });
 
   constructor() {
-    import('@angular/core').then(({ effect }) => {
-      effect(() => {
-        this.searchTerm();
-        this.currentPage.set(1);
-      }, { allowSignalWrites: true });
+    effect(() => {
+      this.searchTerm();
+      this.currentPage.set(1);
     });
   }
 
@@ -547,7 +566,7 @@ export class LoanListComponent implements OnInit {
         dueDate.setDate(start.getDate() + i);
       } else if (freq === 'WEEKLY') {
         dueDate.setDate(start.getDate() + (i * 7));
-      } else if (freq === 'BIWEEKLY') {
+      } else if (freq === 'BIWEEKLY' || freq === 'BIWEEK') {
         dueDate.setDate(start.getDate() + (i * 15));
       } else if (freq === 'MONTHLY') {
         dueDate.setMonth(start.getMonth() + i);
@@ -601,11 +620,24 @@ export class LoanListComponent implements OnInit {
 
   filteredLoans = computed(() => {
     const term = this.searchTerm().toLowerCase();
-    return this.loanService.loans().filter(l => 
-      (l.clientName || '').toLowerCase().includes(term) ||
-      (l.client?.name || '').toLowerCase().includes(term) || 
-      (l.id || '').toLowerCase().includes(term)
-    );
+    const day = this.selectedDay();
+    return this.loanService.loans().filter(l => {
+      const matchesTerm = (l.clientName || '').toLowerCase().includes(term) ||
+        (l.client?.name || '').toLowerCase().includes(term) || 
+        (l.id || '').toLowerCase().includes(term);
+
+      if (!matchesTerm) return false;
+
+      if (day && day !== '') {
+        const dateToUse = l.dueDate ? new Date(l.dueDate) : (l.startDate ? new Date(l.startDate) : null);
+        if (dateToUse) {
+          // Ajustamos para comparar con getDay(): 0 = Domingo, 1 = Lunes, etc.
+          return dateToUse.getDay() === parseInt(day, 10);
+        }
+        return false;
+      }
+      return true;
+    });
   });
 
   totalOnStreet = computed(() => {
@@ -630,7 +662,7 @@ export class LoanListComponent implements OnInit {
       interestRate: this.interestRate(),
       totalInstallments: this.totalInstallments(),
       startDate: this.startDate(),
-      paymentFrequency: this.paymentFrequency()
+      paymentFrequency: (this.paymentFrequency() || 'DAILY').toUpperCase() as any
     };
 
     const obs = this.isEditing() && this.selectedLoanId()

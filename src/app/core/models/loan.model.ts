@@ -11,8 +11,8 @@ export interface Loan {
   startDate: string;
   dueDate: string;
   status: string;
-  paymentFrequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
-  frequency?: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+  paymentFrequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'BIWEEK' | 'MONTHLY';
+  frequency?: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'BIWEEK' | 'MONTHLY';
   client?: {
     id: string;
     name: string;
@@ -26,7 +26,7 @@ export interface LoanCreateRequest {
   interestRate: number;
   totalInstallments: number;
   startDate: string;
-  paymentFrequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY';
+  paymentFrequency: 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'BIWEEK' | 'MONTHLY';
 }
 
 export interface PaymentRequest {

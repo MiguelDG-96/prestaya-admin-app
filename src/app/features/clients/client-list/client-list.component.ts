@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, computed } from '@angular/core';
+import { Component, inject, signal, OnInit, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { 
@@ -132,7 +132,7 @@ import { ClientCreateRequest, Client } from '../../../core/models/client.model';
                     </button>
                     <button 
                       *ngIf="authService.hasAuthority('CLIENTS_DELETE')"
-                      (click)="deleteClient(client.id)"
+                      (click)="openDeleteModal(client.id)"
                       class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all border border-slate-100"
                       title="Eliminar Cliente"
                     >
@@ -285,6 +285,38 @@ import { ClientCreateRequest, Client } from '../../../core/models/client.model';
           </form>
         </div>
       </div>
+
+      <!-- Delete Confirmation Modal -->
+      <div *ngIf="showDeleteModal()" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" (click)="showDeleteModal.set(false)"></div>
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 relative z-10 animate-in zoom-in-95 duration-200 overflow-hidden text-center border border-slate-100">
+          <div class="absolute top-0 left-0 w-full h-1 bg-rose-500"></div>
+          
+          <div class="w-14 h-14 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <lucide-icon name="trash-2" class="w-7 h-7"></lucide-icon>
+          </div>
+          
+          <h3 class="text-xl font-black text-slate-900 mb-2">¿Eliminar Cliente?</h3>
+          <p class="text-xs text-slate-500 font-medium mb-6">Esta acción ocultará permanentemente al cliente de tu lista principal de gestión.</p>
+          
+          <div class="flex gap-3 justify-center">
+            <button 
+              type="button" 
+              (click)="showDeleteModal.set(false)" 
+              class="flex-1 py-3 bg-slate-50 text-slate-600 rounded-2xl font-black text-xs hover:bg-slate-100 transition-all border border-slate-100"
+            >
+              Cancelar
+            </button>
+            <button 
+              type="button" 
+              (click)="confirmDelete()" 
+              class="flex-1 py-3 bg-rose-500 text-white rounded-2xl font-black text-xs hover:bg-rose-600 hover:shadow-lg hover:shadow-rose-500/10 transition-all"
+            >
+              Sí, eliminar
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   `
 })
@@ -294,17 +326,19 @@ export class ClientListComponent implements OnInit {
   
   searchTerm = signal('');
   showCreateModal = signal(false);
+  showDeleteModal = signal(false);
   isSaving = signal(false);
   isConsulting = signal(false);
   isRefreshing = signal(false);
   isEditing = signal(false);
   selectedClientId = signal<string | null>(null);
+  clientIdToDelete = signal<string | null>(null);
 
   filteredClients = computed(() => {
     const term = this.searchTerm().toLowerCase();
     return this.clientService.clients().filter(c => 
-      c.name.toLowerCase().includes(term) || 
-      c.dni.toLowerCase().includes(term)
+      (c.name || '').toLowerCase().includes(term) || 
+      (c.dni || '').toLowerCase().includes(term)
     );
   });
   
@@ -332,11 +366,9 @@ export class ClientListComponent implements OnInit {
   });
 
   constructor() {
-    import('@angular/core').then(({ effect }) => {
-      effect(() => {
-        this.searchTerm();
-        this.currentPage.set(1);
-      }, { allowSignalWrites: true });
+    effect(() => {
+      this.searchTerm();
+      this.currentPage.set(1);
     });
   }
 
@@ -451,9 +483,21 @@ export class ClientListComponent implements OnInit {
     });
   }
 
-  deleteClient(id: string) {
-    if (confirm('¿Estás seguro de eliminar este cliente?')) {
-      this.clientService.deleteClient(id).subscribe();
+  openDeleteModal(id: string) {
+    this.clientIdToDelete.set(id);
+    this.showDeleteModal.set(true);
+  }
+
+  confirmDelete() {
+    const id = this.clientIdToDelete();
+    if (id) {
+      this.clientService.deleteClient(id).subscribe({
+        next: () => {
+          this.showDeleteModal.set(false);
+          this.clientIdToDelete.set(null);
+          this.refreshData(); // Refresh list after deleting
+        }
+      });
     }
   }
 

@@ -26,19 +26,25 @@ export class ClientService {
 
   createClient(client: ClientCreateRequest): Observable<Client> {
     return this.http.post<Client>(this.apiUrl, client).pipe(
-      tap(() => this.loadClients().subscribe())
+      tap(newClient => {
+        this.clients.update(existing => [...existing, newClient]);
+      })
     );
   }
 
   deleteClient(id: string): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`).pipe(
-      tap(() => this.loadClients().subscribe())
+      tap(() => {
+        this.clients.update(existing => existing.filter(c => c.id !== id));
+      })
     );
   }
 
   updateClient(id: string, client: Partial<Client>): Observable<Client> {
     return this.http.put<Client>(`${this.apiUrl}/${id}`, client).pipe(
-      tap(() => this.loadClients().subscribe())
+      tap(updatedClient => {
+        this.clients.update(existing => existing.map(c => c.id === id ? updatedClient : c));
+      })
     );
   }
 

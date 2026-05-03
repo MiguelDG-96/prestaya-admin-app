@@ -466,8 +466,8 @@ export class LoanFormComponent implements OnInit {
   filteredClientsForSelect = computed(() => {
     const term = this.clientSearchTerm().toLowerCase();
     return this.clientService.clients().filter(c => 
-      c.name.toLowerCase().includes(term) || 
-      c.dni.includes(term)
+      (c.name || '').toLowerCase().includes(term) || 
+      (c.dni || '').includes(term)
     );
   });
 
@@ -561,7 +561,7 @@ export class LoanFormComponent implements OnInit {
       amount: this.loan.amount,
       interestRate: this.loan.interestRate,
       totalInstallments: this.loan.totalInstallments,
-      paymentFrequency: this.loan.paymentFrequency,
+      paymentFrequency: (this.loan.paymentFrequency || 'MONTHLY').toUpperCase() as any,
       startDate: this.loan.startDate
     };
 

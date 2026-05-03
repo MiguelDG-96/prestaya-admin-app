@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, computed } from '@angular/core';
+import { Component, inject, signal, OnInit, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { 
@@ -273,11 +273,9 @@ export class TenantListComponent implements OnInit {
   });
 
   constructor() {
-    import('@angular/core').then(({ effect }) => {
-      effect(() => {
-        this.searchTerm();
-        this.currentPage.set(1);
-      }, { allowSignalWrites: true });
+    effect(() => {
+      this.searchTerm();
+      this.currentPage.set(1);
     });
   }
 
