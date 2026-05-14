@@ -39,12 +39,20 @@ import { FormsModule } from '@angular/forms';
             <lucide-icon name="arrow-left" class="w-6 h-6"></lucide-icon>
           </button>
           <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="bg-emerald-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest animate-pulse">Sistema de Auditoría v2</span>
+              <span class="text-[10px] text-slate-400 font-bold tracking-tighter">Sync: OK</span>
+            </div>
             <h1 class="text-2xl font-black text-slate-900 tracking-tight">Detalle del Préstamo</h1>
             <p class="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-0.5">{{ loan()?.clientName || loan()?.client?.name }} • Ref. {{ loan()?.id?.substring(0,8) }}</p>
           </div>
         </div>
         
         <div class="flex items-center gap-3">
+          <div class="bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100 flex items-center gap-3">
+            <div class="w-2 h-2 rounded-full bg-indigo-500 animate-ping"></div>
+            <span class="text-[9px] font-black text-indigo-600 uppercase tracking-widest">Modo Protección de Fechas Activo</span>
+          </div>
           <button 
             *ngIf="authService.hasAuthority('PRESTAMOS_UPDATE')"
             (click)="editLoan()"
@@ -165,11 +173,19 @@ import { FormsModule } from '@angular/forms';
                     </div>
                     <div>
                       <div class="flex items-center gap-2 mb-1">
-                        <p class="text-[8px] font-black uppercase tracking-widest" [class]="inst.isPaid ? 'text-emerald-600' : 'text-slate-400'">Cuota nº {{ inst.number }}</p>
+                        <p class="text-[8px] font-black uppercase tracking-widest" [class]="inst.isPaid ? 'text-emerald-600' : 'text-slate-400'">
+                          Cuota nº {{ inst.number }} 
+                          <span *ngIf="inst.isPaid" class="text-[7px] text-slate-400 ml-1">(Prog: {{ inst.dueDate | date:'dd/MM/yy' }})</span>
+                        </p>
                         <span *ngIf="!inst.isPaid" class="bg-amber-50 text-amber-600 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider border border-amber-200/60 leading-none">Pendiente</span>
                         <span *ngIf="inst.isPaid" class="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase tracking-wider border border-emerald-200/60 leading-none">Pagado</span>
                       </div>
-                      <p class="font-black text-slate-900 text-sm tracking-tight">{{ inst.dueDate | date:'dd MMMM, yyyy' }}</p>
+                      <p class="font-black text-slate-900 text-sm tracking-tight">
+                        {{ inst.isPaid ? (inst.realPaymentDate | date:'dd MMMM, yyyy':'UTC') : (inst.dueDate | date:'dd MMMM, yyyy':'UTC') }}
+                      </p>
+                      <p *ngIf="inst.isPaid" class="text-[7px] font-bold text-slate-400 mt-0.5 uppercase tracking-tighter">
+                        Vencimiento Original: {{ inst.dueDate | date:'dd/MM/yy':'UTC' }}
+                      </p>
                     </div>
                   </div>
                   
@@ -209,7 +225,7 @@ import { FormsModule } from '@angular/forms';
                 </div>
                 <div>
                   <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha de Emisión</p>
-                  <p class="font-black text-slate-900 text-sm">{{ loan()?.startDate | date:'dd/MM/yyyy' }}</p>
+                  <p class="font-black text-slate-900 text-sm">{{ loan()?.startDate | date:'dd/MM/yyyy':'UTC' }}</p>
                 </div>
               </div>
               <div class="flex items-center gap-4">
@@ -218,7 +234,7 @@ import { FormsModule } from '@angular/forms';
                 </div>
                 <div>
                   <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Próximo Vencimiento</p>
-                  <p class="font-black text-slate-900 text-sm">{{ loan()?.dueDate | date:'dd/MM/yyyy' }}</p>
+                  <p class="font-black text-slate-900 text-sm">{{ loan()?.dueDate | date:'dd/MM/yyyy':'UTC' }}</p>
                 </div>
               </div>
             </div>
@@ -280,6 +296,23 @@ import { FormsModule } from '@angular/forms';
                   [ngModel]="paymentAmount()" 
                   (ngModelChange)="paymentAmount.set($event)"
                   name="paymentAmount"
+                  required
+                  class="w-full bg-slate-50 border border-slate-100 rounded-xl pl-10 pr-4 py-3 font-black text-slate-900 outline-none focus:border-emerald-600 focus:bg-white transition-all text-sm"
+                >
+              </div>
+            </div>
+
+            <div>
+              <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Fecha de Pago</label>
+              <div class="relative group">
+                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <lucide-icon name="calendar" class="w-4 h-4 text-slate-400"></lucide-icon>
+                </div>
+                <input 
+                  type="date" 
+                  [ngModel]="paymentDate()" 
+                  (ngModelChange)="paymentDate.set($event)"
+                  name="paymentDate"
                   required
                   class="w-full bg-slate-50 border border-slate-100 rounded-xl pl-10 pr-4 py-3 font-black text-slate-900 outline-none focus:border-emerald-600 focus:bg-white transition-all text-sm"
                 >
@@ -348,6 +381,26 @@ export class LoanDetailComponent implements OnInit {
   isDeleting = signal(false);
   selectedInstallment = signal<any>(null);
   paymentAmount = signal<number>(0);
+  paymentDate = signal<string>(new Date().toISOString().split('T')[0]);
+  payments = signal<any[]>([]);
+
+  private parseBackendDate(date: any): Date | null {
+    if (!date) return null;
+    if (Array.isArray(date)) {
+      // Usar Date.UTC para evitar desfases de zona horaria
+      return new Date(Date.UTC(date[0], date[1] - 1, date[2], 12, 0, 0));
+    }
+    if (typeof date === 'string') {
+      const parts = date.split('T')[0].split('-');
+      if (parts.length === 3) {
+        return new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0));
+      }
+    }
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return null;
+    // Si ya es un objeto Date o string ISO, forzamos a mediodía UTC para consistencia
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0));
+  }
 
   progress = computed(() => {
     const l = this.loan();
@@ -358,30 +411,41 @@ export class LoanDetailComponent implements OnInit {
   installmentSchedule = computed(() => {
     const l = this.loan();
     if (!l || !l.startDate) return [];
-    const schedule = [];
-    
-    // Convertir de forma segura para evitar problemas de zona horaria (UTC vs Local)
-    const parts = l.startDate.split('T')[0].split('-');
-    const start = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0);
-    const amountPerInstallment = l.totalToPay / l.totalInstallments;
-    
-    for (let i = 1; i <= l.totalInstallments; i++) {
-      const dueDate = new Date(start);
-      // Calcular la fecha basándose en la frecuencia
-      const freq = l.paymentFrequency || l.frequency;
-      if (freq === 'DAILY') dueDate.setDate(start.getDate() + i);
-      else if (freq === 'WEEKLY') dueDate.setDate(start.getDate() + (i * 7));
-      else if (freq === 'BIWEEKLY') dueDate.setDate(start.getDate() + (i * 14));
-      else dueDate.setMonth(start.getMonth() + i);
 
-      schedule.push({
+    const paymentsList = (this.payments() || []).sort((a, b) => {
+      const dateA = this.parseBackendDate(a.paymentDate)?.getTime() || 0;
+      const dateB = this.parseBackendDate(b.paymentDate)?.getTime() || 0;
+      return dateA - dateB;
+    });
+
+    const installments = [];
+    const startDate = this.parseBackendDate(l.startDate);
+    if (!startDate) return [];
+
+    for (let i = 1; i <= (l.totalInstallments || 0); i++) {
+      const dueDate = new Date(startDate);
+      const freq = l.paymentFrequency || l.frequency;
+      if (freq === 'DAILY') {
+        dueDate.setDate(startDate.getDate() + i);
+      } else if (freq === 'WEEKLY') {
+        dueDate.setDate(startDate.getDate() + (i * 7));
+      } else if (freq === 'BIWEEKLY') {
+        dueDate.setDate(startDate.getDate() + (i * 14));
+      } else if (freq === 'MONTHLY') {
+        dueDate.setMonth(startDate.getMonth() + i);
+      }
+
+      const payment = paymentsList[i - 1];
+
+      installments.push({
         number: i,
         dueDate: dueDate,
-        amount: amountPerInstallment,
-        isPaid: i <= (l.paidInstallments || 0)
+        amount: (l.totalToPay || 0) / (l.totalInstallments || 1),
+        isPaid: i <= (l.paidInstallments || 0),
+        realPaymentDate: payment ? this.parseBackendDate(payment.paymentDate) : null
       });
     }
-    return schedule;
+    return installments;
   });
 
   ngOnInit() {
@@ -396,6 +460,14 @@ export class LoanDetailComponent implements OnInit {
       const l = loans.find(x => x.id === id);
       if (l) {
         this.loan.set(l);
+        this.loanService.getPayments(id).subscribe(p => {
+          const sorted = (p || []).sort((a, b) => {
+            const dateA = this.parseBackendDate(a.paymentDate)?.getTime() || 0;
+            const dateB = this.parseBackendDate(b.paymentDate)?.getTime() || 0;
+            return dateA - dateB;
+          });
+          this.payments.set(sorted);
+        });
       } else {
         this.router.navigate(['/loans']);
       }
@@ -426,6 +498,7 @@ export class LoanDetailComponent implements OnInit {
 
     // Asegurarnos de redondear a 2 decimales para evitar problemas de precisión
     this.paymentAmount.set(Math.max(0, parseFloat(toPay.toFixed(2))));
+    this.paymentDate.set(new Date().toISOString().split('T')[0]);
     this.showPaymentModal.set(true);
   }
 
@@ -437,7 +510,8 @@ export class LoanDetailComponent implements OnInit {
     this.loanService.registerPayment({
       loanId: l.id,
       amount: this.paymentAmount(),
-      note: `Pago de cuota ${this.selectedInstallment()?.number}`
+      note: `Pago de cuota ${this.selectedInstallment()?.number}`,
+      paymentDate: this.paymentDate()
     }).subscribe({
       next: () => {
         this.isSaving.set(false);

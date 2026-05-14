@@ -39,6 +39,10 @@ import { FormsModule } from '@angular/forms';
             <lucide-icon name="arrow-left" class="w-6 h-6"></lucide-icon>
           </button>
           <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="bg-indigo-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest animate-pulse">Auditoría Alquiler v2</span>
+              <span class="text-[10px] text-slate-400 font-bold tracking-tighter">Sync: Realtime</span>
+            </div>
             <h1 class="text-2xl font-black text-slate-900 tracking-tight">Detalle del Alquiler</h1>
             <p class="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-0.5">Gestión de Propiedad • Inmueble {{ rental()?.roomNumber }}</p>
           </div>
@@ -163,7 +167,12 @@ import { FormsModule } from '@angular/forms';
                       </p>
                       <div *ngIf="!month.isPaid" class="w-1 h-1 rounded-full bg-amber-400"></div>
                     </div>
-                    <p class="font-black text-slate-900 text-sm tracking-tight">{{ month.dueDate | date:'dd MMMM, yyyy' }}</p>
+                    <p class="font-black text-slate-900 text-sm tracking-tight">
+                      {{ month.isPaid ? (month.realPaymentDate | date:'dd MMMM, yyyy':'UTC') : (month.dueDate | date:'dd MMMM, yyyy':'UTC') }}
+                    </p>
+                    <p *ngIf="month.isPaid" class="text-[7px] font-bold text-slate-400 mt-0.5 uppercase tracking-tighter">
+                      Vencimiento Original: {{ month.dueDate | date:'dd/MM/yy':'UTC' }}
+                    </p>
                   </div>
                 </div>
                 
@@ -203,7 +212,7 @@ import { FormsModule } from '@angular/forms';
                 </div>
                 <div>
                   <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Inicio Contrato</p>
-                  <p class="font-black text-slate-900 text-sm tracking-tight">{{ rental()?.startDate | date:'dd/MM/yyyy' }}</p>
+                  <p class="font-black text-slate-900 text-sm tracking-tight">{{ rental()?.startDate | date:'dd/MM/yyyy':'UTC' }}</p>
                 </div>
               </div>
               <div class="flex items-center gap-5">
@@ -212,7 +221,7 @@ import { FormsModule } from '@angular/forms';
                 </div>
                 <div>
                   <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Próximo Cobro</p>
-                  <p class="font-black text-slate-900 text-sm tracking-tight">{{ rental()?.dueDate | date:'dd/MM/yyyy' }}</p>
+                  <p class="font-black text-slate-900 text-sm tracking-tight">{{ rental()?.dueDate | date:'dd/MM/yyyy':'UTC' }}</p>
                 </div>
               </div>
             </div>
@@ -270,6 +279,23 @@ import { FormsModule } from '@angular/forms';
             <p class="text-3xl font-black text-slate-900 tracking-tighter">S/ {{ selectedMonth()?.amount | number:'1.2-2' }}</p>
           </div>
 
+          <div class="mb-6">
+            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Fecha de Pago</label>
+            <div class="relative group">
+              <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <lucide-icon name="calendar" class="w-4 h-4 text-slate-400"></lucide-icon>
+              </div>
+              <input 
+                type="date" 
+                [ngModel]="paymentDate()" 
+                (ngModelChange)="paymentDate.set($event)"
+                name="paymentDate"
+                required
+                class="w-full bg-slate-50 border border-slate-100 rounded-xl pl-10 pr-4 py-3 font-black text-slate-900 outline-none focus:border-indigo-600 focus:bg-white transition-all text-sm"
+              >
+            </div>
+          </div>
+
           <div class="space-y-5">
             <div class="flex gap-3">
               <button (click)="showPaymentModal.set(false)" class="flex-1 py-4 font-black text-slate-400 hover:text-slate-900 transition-all text-xs">Cancelar</button>
@@ -321,23 +347,54 @@ export class RentalDetailComponent implements OnInit {
   isSaving = signal(false);
   isDeleting = signal(false);
   selectedMonth = signal<any>(null);
+  paymentDate = signal<string>(new Date().toISOString().split('T')[0]);
+  payments = signal<any[]>([]);
+
+  private parseBackendDate(date: any): Date | null {
+    if (!date) return null;
+    if (Array.isArray(date)) {
+      return new Date(Date.UTC(date[0], date[1] - 1, date[2], 12, 0, 0));
+    }
+    if (typeof date === 'string') {
+      const parts = date.split('T')[0].split('-');
+      if (parts.length === 3) {
+        return new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0));
+      }
+    }
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return null;
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0));
+  }
 
   paymentSchedule = computed(() => {
     const r = this.rental();
-    if (!r) return [];
-    const schedule = [];
-    const start = new Date(r.startDate);
-    for (let i = 1; i <= r.totalMonths; i++) {
-      const dueDate = new Date(start);
-      dueDate.setMonth(start.getMonth() + i - 1); // Month 1 is the start month roughly
-      schedule.push({
+    if (!r || !r.startDate) return [];
+
+    const paymentsList = (this.payments() || []).sort((a, b) => {
+      const dateA = this.parseBackendDate(a.paymentDate)?.getTime() || 0;
+      const dateB = this.parseBackendDate(b.paymentDate)?.getTime() || 0;
+      return dateA - dateB;
+    });
+
+    const months = [];
+    const startDate = this.parseBackendDate(r.startDate);
+    if (!startDate) return [];
+
+    for (let i = 1; i <= (r.totalMonths || 0); i++) {
+      const dueDate = new Date(startDate);
+      dueDate.setMonth(startDate.getMonth() + i - 1); 
+      
+      const payment = paymentsList[i - 1];
+
+      months.push({
         month: i,
         dueDate: dueDate,
         amount: r.amount,
-        isPaid: i <= (r.paidMonths || 0)
+        isPaid: i <= (r.paidMonths || 0),
+        realPaymentDate: payment ? this.parseBackendDate(payment.paymentDate) : null
       });
     }
-    return schedule;
+    return months;
   });
 
   ngOnInit() {
@@ -348,18 +405,22 @@ export class RentalDetailComponent implements OnInit {
   }
 
   loadRental(id: string) {
-    // In a real app we'd have getRentalById, but here we can find it from the signal if already loaded
-    // or reload rentals and find it. For now, let's just find it or reload.
-    const found = this.rentalService.rentals().find(r => r.id === id);
-    if (found) {
-      this.rental.set(found);
-    } else {
-      this.rentalService.loadRentals().subscribe(rentals => {
-        const r = rentals.find(x => x.id === id);
-        if (r) this.rental.set(r);
-        else this.router.navigate(['/rentals']);
-      });
-    }
+    this.rentalService.loadRentals().subscribe(rentals => {
+      const r = rentals.find(x => x.id === id);
+      if (r) {
+        this.rental.set(r);
+        this.rentalService.getPayments(id).subscribe(p => {
+          const sorted = (p || []).sort((a, b) => {
+            const dateA = this.parseBackendDate(a.paymentDate)?.getTime() || 0;
+            const dateB = this.parseBackendDate(b.paymentDate)?.getTime() || 0;
+            return dateA - dateB;
+          });
+          this.payments.set(sorted);
+        });
+      } else {
+        this.router.navigate(['/rentals']);
+      }
+    });
   }
 
   editRental() {
@@ -372,6 +433,7 @@ export class RentalDetailComponent implements OnInit {
 
   openPaymentModal(month: any) {
     this.selectedMonth.set(month);
+    this.paymentDate.set(new Date().toISOString().split('T')[0]);
     this.showPaymentModal.set(true);
   }
 
@@ -382,7 +444,8 @@ export class RentalDetailComponent implements OnInit {
     this.rentalService.registerPayment({
       rentalId: r.id,
       amount: r.amount,
-      note: `Pago de mes ${this.selectedMonth()?.month}`
+      note: `Pago de mes ${this.selectedMonth()?.month}`,
+      paymentDate: this.paymentDate()
     }).subscribe({
       next: () => {
         this.isSaving.set(false);

@@ -30,11 +30,12 @@ export class RentalService {
     );
   }
 
-  registerPayment(payment: { rentalId: string; amount: number; note?: string }): Observable<void> {
+  registerPayment(payment: { rentalId: string; amount: number; note?: string; paymentDate?: string }): Observable<void> {
     const payload = {
       rental: { id: payment.rentalId },
       amount: payment.amount,
-      notes: payment.note
+      notes: payment.note,
+      paymentDate: payment.paymentDate
     };
     return this.http.post<void>(`${environment.apiUrl}/payments`, payload).pipe(
       tap(() => this.loadRentals().subscribe())

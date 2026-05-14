@@ -391,7 +391,13 @@ import { RouterModule } from '@angular/router';
               </div>
               <div>
                 <h3 class="text-xl font-black text-slate-900 tracking-tight">Cronograma</h3>
-                <p class="text-xs text-slate-500 font-medium">{{ selectedLoan()?.client?.name }}</p>
+                <div class="flex items-center justify-between">
+                  <span class="text-[#7B61FF] bg-indigo-50 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border border-indigo-100 flex items-center gap-2">
+                    <div class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping"></div>
+                    Protección UTC Activa
+                  </span>
+                  <span class="text-slate-400">Emisión: {{ selectedLoan()?.startDate | date:'dd/MM/yyyy':'UTC' }}</span>
+                </div>
               </div>
             </div>
             <button (click)="showDetailsModal.set(false)" class="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center hover:text-slate-900 transition-all">
@@ -415,7 +421,7 @@ import { RouterModule } from '@angular/router';
           </div>
 
           <div class="flex-1 overflow-y-auto pr-1 space-y-3 custom-scrollbar">
-            <div *ngFor="let inst of getLoanSchedule(selectedLoan()); let i = index" 
+            <div *ngFor="let inst of getLoanSchedule(selectedLoan(), payments()); let i = index" 
                  class="flex items-center justify-between p-4 rounded-2xl border transition-all"
                  [class]="inst.isPaid ? 'bg-emerald-50 border-emerald-100 opacity-60' : 'bg-slate-50 border-slate-100'">
               <div class="flex items-center gap-4">
@@ -424,10 +430,12 @@ import { RouterModule } from '@angular/router';
                   {{ i + 1 }}
                 </div>
                 <div>
-                  <p class="text-[8px] font-black uppercase tracking-widest mb-0.5" [class]="inst.isPaid ? 'text-emerald-700' : 'text-slate-400'">
-                    {{ inst.isPaid ? 'Pagada' : 'Pendiente' }}
+                  <p class="font-black text-slate-900 text-xs tracking-tight">
+                    {{ inst.isPaid ? (inst.realPaymentDate | date:'dd MMM yyyy':'UTC') : (inst.dueDate | date:'dd MMM yyyy':'UTC') }}
                   </p>
-                  <p class="font-black text-slate-900 text-xs tracking-tight">{{ inst.dueDate | date:'dd MMM yyyy' }}</p>
+                  <p *ngIf="inst.isPaid" class="text-[7px] font-bold text-slate-400 mt-0.5 uppercase tracking-tighter">
+                    Programado: {{ inst.dueDate | date:'dd/MM/yy':'UTC' }}
+                  </p>
                 </div>
               </div>
               <div class="text-right">
@@ -462,6 +470,21 @@ import { RouterModule } from '@angular/router';
               <div class="relative group">
                 <span class="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400 text-lg">S/</span>
                 <input type="number" [(ngModel)]="paymentAmount" class="w-full bg-slate-50 border border-slate-100 rounded-xl pl-10 pr-4 py-4 font-black text-slate-900 text-xl outline-none focus:border-emerald-400 focus:bg-white transition-all tracking-tight">
+              </div>
+            </div>
+
+            <div>
+              <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Fecha de Pago</label>
+              <div class="relative group">
+                <lucide-icon name="calendar" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"></lucide-icon>
+                <input 
+                  type="date" 
+                  [ngModel]="paymentDate()" 
+                  (ngModelChange)="paymentDate.set($event)"
+                  name="paymentDate"
+                  required
+                  class="w-full bg-slate-50 border border-slate-100 rounded-xl pl-12 pr-4 py-4 font-black text-slate-900 outline-none focus:border-emerald-400 focus:bg-white transition-all"
+                >
               </div>
             </div>
             <div class="flex gap-3 pt-2">
@@ -507,6 +530,7 @@ export class LoanListComponent implements OnInit {
   selectedLoanForPayment = signal<Loan | null>(null);
   payments = signal<any[]>([]);
   paymentAmount = 0;
+  paymentDate = signal<string>(new Date().toISOString().split('T')[0]);
 
   clientId = signal('');
   amount = signal(0);
@@ -550,6 +574,81 @@ export class LoanListComponent implements OnInit {
       this.searchTerm();
       this.currentPage.set(1);
     });
+
+    // Efecto para mantener sincronizado el préstamo seleccionado en el modal
+    effect(() => {
+      const loans = this.loanService.loans();
+      const selected = this.selectedLoan();
+      if (selected && this.showDetailsModal()) {
+        const updated = loans.find(l => l.id === selected.id);
+        if (updated && (updated.amountPaid !== selected.amountPaid || updated.paidInstallments !== selected.paidInstallments)) {
+          this.selectedLoan.set(updated);
+          // Refrescar pagos también
+          this.loanService.getPayments(updated.id).subscribe(p => {
+            const sorted = (p || []).sort((a, b) => {
+              const dateA = this.parseBackendDate(a.paymentDate)?.getTime() || 0;
+              const dateB = this.parseBackendDate(b.paymentDate)?.getTime() || 0;
+              return dateA - dateB;
+            });
+            this.payments.set(sorted);
+          });
+        }
+      }
+    }, { allowSignalWrites: true });
+  }
+
+  private parseBackendDate(date: any): Date | null {
+    if (!date) return null;
+    if (Array.isArray(date)) {
+      return new Date(Date.UTC(date[0], date[1] - 1, date[2], 12, 0, 0));
+    }
+    if (typeof date === 'string') {
+      const parts = date.split('T')[0].split('-');
+      if (parts.length === 3) {
+        return new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10), 12, 0, 0));
+      }
+    }
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return null;
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12, 0, 0));
+  }
+
+  getLoanSchedule(l: Loan | null, payments: any[]) {
+    if (!l || !l.startDate) return [];
+    
+    const sortedPayments = [...payments].sort((a, b) => {
+      const dateA = this.parseBackendDate(a.paymentDate)?.getTime() || 0;
+      const dateB = this.parseBackendDate(b.paymentDate)?.getTime() || 0;
+      return dateA - dateB;
+    });
+
+    const installments = [];
+    const startDate = this.parseBackendDate(l.startDate);
+    if (!startDate) return [];
+
+    for (let i = 1; i <= (l.totalInstallments || 0); i++) {
+      const dueDate = new Date(startDate);
+      const freq = l.paymentFrequency || l.frequency || 'DAILY';
+      if (freq === 'DAILY') {
+        dueDate.setDate(startDate.getDate() + i);
+      } else if (freq === 'WEEKLY') {
+        dueDate.setDate(startDate.getDate() + (i * 7));
+      } else if (freq === 'BIWEEKLY') {
+        dueDate.setDate(startDate.getDate() + (i * 14));
+      } else if (freq === 'MONTHLY') {
+        dueDate.setMonth(startDate.getMonth() + i);
+      }
+
+      const payment = sortedPayments[i - 1];
+
+      installments.push({
+        dueDate: dueDate,
+        amount: (l.totalToPay || 0) / (l.totalInstallments || 1),
+        isPaid: i <= (l.paidInstallments || 0),
+        realPaymentDate: payment ? this.parseBackendDate(payment.paymentDate) : null
+      });
+    }
+    return installments;
   }
 
   ngOnInit() {
@@ -574,21 +673,6 @@ export class LoanListComponent implements OnInit {
       installments.push({ month: i, dueDate: dueDate, amount: instAmount });
     }
     return installments;
-  }
-
-  getLoanSchedule(loan: Loan | null) {
-    if (!loan) return [];
-    const amt = loan.amount || 0;
-    const rate = loan.interestRate || 0;
-    const interest = amt * (rate > 1 ? rate / 100 : rate);
-    const total = amt + interest;
-    const instAmt = total / (loan.totalInstallments || 1);
-    
-    const schedule = this.generateSchedule(loan.startDate || new Date().toISOString(), instAmt, loan.totalInstallments || 0, loan.paymentFrequency || loan.frequency || 'DAILY');
-    return schedule.map((inst, index) => ({
-      ...inst,
-      isPaid: index < (loan.paidInstallments || 0)
-    }));
   }
 
   openCreateModal() {
@@ -651,7 +735,14 @@ export class LoanListComponent implements OnInit {
   openDetailsModal(loan: Loan) {
     this.selectedLoan.set(loan);
     this.showDetailsModal.set(true);
-    this.loanService.getPayments(loan.id).subscribe(p => this.payments.set(p));
+    this.loanService.getPayments(loan.id).subscribe(p => {
+      const sorted = (p || []).sort((a, b) => {
+        const dateA = this.parseBackendDate(a.paymentDate)?.getTime() || 0;
+        const dateB = this.parseBackendDate(b.paymentDate)?.getTime() || 0;
+        return dateA - dateB;
+      });
+      this.payments.set(sorted);
+    });
   }
 
   saveLoan() {
@@ -693,6 +784,7 @@ export class LoanListComponent implements OnInit {
     this.selectedLoanForPayment.set(loan);
     const suggested = (loan.totalToPay || 0) / (loan.totalInstallments || 1);
     this.paymentAmount = suggested;
+    this.paymentDate.set(new Date().toISOString().split('T')[0]);
     this.showPaymentModal.set(true);
   }
 
@@ -703,7 +795,8 @@ export class LoanListComponent implements OnInit {
     this.loanService.registerPayment({
       loanId: loan.id,
       amount: this.paymentAmount,
-      note: 'Cobro realizado desde Panel Admin'
+      note: 'Cobro realizado desde Panel Admin',
+      paymentDate: this.paymentDate()
     }).subscribe({
       next: () => {
         this.showPaymentModal.set(false);

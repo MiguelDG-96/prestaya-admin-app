@@ -64,6 +64,25 @@ import { RouterModule } from '@angular/router';
               class="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-11 pr-4 py-3.5 font-bold text-slate-900 focus:ring-4 focus:ring-[#7B61FF]/10 focus:border-[#7B61FF] focus:bg-white transition-all outline-none text-[11px] shadow-sm"
             >
           </div>
+          <div class="relative min-w-[180px] group">
+            <select 
+              [ngModel]="selectedDay()"
+              (ngModelChange)="selectedDay.set($event)"
+              class="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-4 pr-10 py-3.5 font-bold text-slate-900 focus:ring-4 focus:ring-[#7B61FF]/10 focus:border-[#7B61FF] focus:bg-white transition-all outline-none text-[11px] shadow-sm appearance-none"
+            >
+              <option value="">Todos los días</option>
+              <option value="1">Lunes</option>
+              <option value="2">Martes</option>
+              <option value="3">Miércoles</option>
+              <option value="4">Jueves</option>
+              <option value="5">Viernes</option>
+              <option value="6">Sábado</option>
+              <option value="0">Domingo</option>
+            </select>
+            <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+              <lucide-icon name="calendar" class="w-4 h-4 text-slate-400"></lucide-icon>
+            </div>
+          </div>
           <div class="flex items-center gap-3">
             <button 
               (click)="refreshData()"
@@ -268,6 +287,21 @@ import { RouterModule } from '@angular/router';
                 <input type="number" [(ngModel)]="paymentAmount" class="w-full bg-slate-50 border border-slate-100 rounded-xl pl-10 pr-4 py-4 font-black text-slate-900 text-xl outline-none focus:border-indigo-600 focus:bg-white transition-all tracking-tight">
               </div>
             </div>
+
+            <div>
+              <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Fecha de Pago</label>
+              <div class="relative group">
+                <lucide-icon name="calendar" class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"></lucide-icon>
+                <input 
+                  type="date" 
+                  [ngModel]="paymentDate()" 
+                  (ngModelChange)="paymentDate.set($event)"
+                  name="paymentDate"
+                  required
+                  class="w-full bg-slate-50 border border-slate-100 rounded-xl pl-12 pr-4 py-4 font-black text-slate-900 outline-none focus:border-indigo-600 focus:bg-white transition-all"
+                >
+              </div>
+            </div>
             
             <div class="flex gap-3 pt-2">
               <button (click)="showPaymentModal.set(false)" class="flex-1 py-4 font-black text-slate-400 hover:text-slate-900 transition-all text-xs">Cerrar</button>
@@ -406,7 +440,10 @@ import { RouterModule } from '@angular/router';
               </div>
               <div>
                 <h3 class="text-xl font-black text-slate-900">Plan de Pagos</h3>
-                <p class="text-xs text-slate-500 font-medium">Inquilino: {{ selectedRental()?.tenant?.name }}</p>
+                <p class="text-xs text-slate-500 font-medium">
+                  Inquilino: {{ selectedRental()?.tenant?.name }} • 
+                  <span class="text-[#7B61FF]">Emisión: {{ selectedRental()?.startDate | date:'dd/MM/yyyy' }}</span>
+                </p>
               </div>
             </div>
             <button (click)="showDetailsModal.set(false)" class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-900">
@@ -415,7 +452,7 @@ import { RouterModule } from '@angular/router';
           </div>
 
           <div class="flex-1 overflow-y-auto pr-1 space-y-3 custom-scrollbar">
-            <div *ngFor="let month of getPaymentSchedule(selectedRental()!)" 
+            <div *ngFor="let month of getPaymentSchedule(selectedRental()!, payments())" 
                  class="p-4 rounded-2xl border flex items-center justify-between transition-all"
                  [class.bg-emerald-50]="month.isPaid"
                  [class.border-emerald-100]="month.isPaid"
@@ -429,10 +466,15 @@ import { RouterModule } from '@angular/router';
                 </div>
                 <div>
                   <p class="text-[8px] font-black uppercase mb-0.5" [class]="month.isPaid ? 'text-emerald-700' : 'text-slate-400'">Mes {{ month.month }}</p>
-                  <p class="font-black text-slate-900 text-xs tracking-tight">{{ month.dueDate | date:'dd MMM, yyyy' }}</p>
+                  <p class="font-black text-slate-900 text-xs tracking-tight">
+                    {{ month.isPaid ? (month.realPaymentDate | date:'dd MMM, yyyy') : (month.dueDate | date:'dd MMM, yyyy') }}
+                  </p>
                 </div>
               </div>
               <div class="flex items-center gap-3">
+                <div class="text-right mr-2" *ngIf="month.isPaid">
+                  <p class="text-[8px] font-black uppercase text-slate-400">Prog: {{ month.dueDate | date:'dd/MM/yy' }}</p>
+                </div>
                 <p class="font-black text-slate-900 text-sm">S/ {{ month.amount | number:'1.0-0' }}</p>
                 <div *ngIf="month.isPaid" class="bg-emerald-100 text-emerald-600 px-2 py-1 rounded-lg text-[8px] font-black uppercase flex items-center gap-1">
                   <lucide-icon name="check" class="w-3 h-3"></lucide-icon>
@@ -481,11 +523,14 @@ export class RentalListComponent implements OnInit {
   isEditing = signal(false);
   selectedRentalId = signal<string | null>(null);
   tenantErrors = signal<any>({});
+  selectedDay = signal('');
 
   selectedRental = signal<Rental | null>(null);
   selectedRentalForPayment = signal<Rental | null>(null);
   selectedTenantName = signal<string>('');
+  payments = signal<any[]>([]);
   paymentAmount = 0;
+  paymentDate = signal<string>(new Date().toISOString().split('T')[0]);
 
   newRental: any = {
     tenantId: '',
@@ -500,10 +545,25 @@ export class RentalListComponent implements OnInit {
 
   filteredRentals = computed(() => {
     const term = this.searchTerm().toLowerCase();
-    return this.rentalService.rentals().filter(r => 
-      (r.roomNumber || '').toLowerCase().includes(term) ||
-      (r.tenant?.name || '').toLowerCase().includes(term)
-    );
+    const day = this.selectedDay();
+    return this.rentalService.rentals().filter(r => {
+      const matchesTerm = (r.roomNumber || '').toLowerCase().includes(term) ||
+        (r.tenant?.name || '').toLowerCase().includes(term);
+
+      if (!matchesTerm) return false;
+
+      if (day && day !== '') {
+        const dateToUse = r.dueDate ? new Date(r.dueDate) : (r.startDate ? new Date(r.startDate) : null);
+        if (dateToUse) {
+          // Ajustamos para comparar con getDay(): 0 = Domingo, 1 = Lunes, etc.
+          // Nota: New Date(yyyy-mm-dd) puede tener problemas de zona horaria, 
+          // pero comparamos el día de la semana que es lo que pide el usuario.
+          return dateToUse.getDay() === parseInt(day, 10);
+        }
+        return false;
+      }
+      return true;
+    });
   });
 
   currentPage = signal(1);
@@ -539,18 +599,20 @@ export class RentalListComponent implements OnInit {
     return this.rentalService.rentals().filter(r => r.status !== 'PAID').length;
   }
 
-  getPaymentSchedule(rental: Rental) {
+  getPaymentSchedule(rental: Rental, payments: any[] = []) {
     if (!rental) return [];
     const schedule = [];
     const start = new Date(rental.startDate);
     for (let i = 1; i <= rental.totalMonths; i++) {
       const dueDate = new Date(start);
       dueDate.setMonth(start.getMonth() + i);
+      const payment = payments[i - 1];
       schedule.push({
         month: i,
         dueDate: dueDate,
         amount: rental.amount,
-        isPaid: i <= (rental.paidMonths || 0)
+        isPaid: i <= (rental.paidMonths || 0),
+        realPaymentDate: payment ? payment.paymentDate : null
       });
     }
     return schedule;
@@ -559,6 +621,10 @@ export class RentalListComponent implements OnInit {
   openDetailsModal(rental: Rental) {
     this.selectedRental.set(rental);
     this.showDetailsModal.set(true);
+    this.rentalService.getPayments(rental.id).subscribe(p => {
+      const sorted = (p || []).sort((a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime());
+      this.payments.set(sorted);
+    });
   }
 
   openTenantModal() {
@@ -663,6 +729,7 @@ export class RentalListComponent implements OnInit {
   openPaymentModal(rental: Rental) {
     this.selectedRentalForPayment.set(rental);
     this.paymentAmount = rental.amount;
+    this.paymentDate.set(new Date().toISOString().split('T')[0]);
     this.showPaymentModal.set(true);
   }
 
@@ -674,7 +741,8 @@ export class RentalListComponent implements OnInit {
     this.rentalService.registerPayment({
       rentalId: rental.id,
       amount: this.paymentAmount,
-      note: 'Cobro de mensualidad - Panel Admin'
+      note: 'Cobro de mensualidad - Panel Admin',
+      paymentDate: this.paymentDate()
     }).subscribe({
       next: () => {
         this.showPaymentModal.set(false);
