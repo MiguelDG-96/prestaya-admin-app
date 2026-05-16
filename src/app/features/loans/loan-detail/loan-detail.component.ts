@@ -190,10 +190,12 @@ import { FormsModule } from '@angular/forms';
                   </div>
                   
                   <div class="flex items-center gap-6">
-                    <div class="text-right">
-                      <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Importe</p>
-                      <p class="font-black text-slate-900">S/ {{ inst.amount | number:'1.2-2' }}</p>
-                    </div>
+                  <div class="flex flex-col items-end">
+                    <p class="text-xs font-black text-slate-900">S/ {{ inst.amount | number:'1.2-2' }}</p>
+                    <p *ngIf="inst.paidAmount > 0" class="text-[9px] font-bold text-emerald-600 mt-0.5">
+                      Pagado: S/ {{ inst.paidAmount | number:'1.2-2' }}
+                    </p>
+                  </div>
                     
                     <div *ngIf="inst.isPaid" class="bg-emerald-100 text-emerald-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase flex items-center gap-2 border border-emerald-200/50">
                       <lucide-icon name="check-circle-2" class="w-3.5 h-3.5"></lucide-icon>
@@ -488,11 +490,15 @@ export class LoanDetailComponent implements OnInit {
       // Usamos el último pago realizado para esta cuota como referencia de fecha
       const lastPayment = paymentsForThisInst[paymentsForThisInst.length - 1];
       const isForcedPaid = (lastPayment && (lastPayment.notes || '').toLowerCase().includes('completada'));
+      
+      // Calcular el total abonado específicamente a esta cuota
+      const totalPaidForThisInst = paymentsForThisInst.reduce((acc, p) => acc + (p.amount || 0), 0);
 
       installments.push({
         number: i,
         dueDate: dueDate,
         amount: (l.totalToPay || 0) / (l.totalInstallments || 1),
+        paidAmount: totalPaidForThisInst,
         isPaid: i <= (l.paidInstallments || 0) || isForcedPaid,
         realPaymentDate: lastPayment ? this.parseBackendDate(lastPayment.paymentDate) : null
       });
