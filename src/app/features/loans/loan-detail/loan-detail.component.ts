@@ -279,9 +279,33 @@ import { FormsModule } from '@angular/forms';
             <p class="text-[10px] text-slate-500 font-medium uppercase tracking-widest mt-1">Cuota nº {{ selectedInstallment()?.number }} - {{ loan()?.clientName || loan()?.client?.name }}</p>
           </div>
           
-          <div class="bg-slate-50 p-6 rounded-2xl mb-6 border border-slate-100 text-center">
+          <div class="bg-slate-50 p-6 rounded-2xl mb-4 border border-slate-100 text-center relative overflow-hidden">
+            <div *ngIf="adjustmentBalance() !== 0" class="absolute top-0 right-0">
+              <div [class]="adjustmentBalance() < 0 ? 'bg-rose-500' : 'bg-emerald-500'" class="text-[7px] font-black text-white px-2 py-0.5 uppercase tracking-tighter rotate-0">
+                Ajustado
+              </div>
+            </div>
             <p class="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Monto Sugerido</p>
-            <p class="text-3xl font-black text-slate-900 tracking-tighter">S/ {{ selectedInstallment()?.amount | number:'1.2-2' }}</p>
+            <p class="text-3xl font-black text-slate-900 tracking-tighter">S/ {{ selectedInstallment()?.amount - adjustmentBalance() | number:'1.2-2' }}</p>
+          </div>
+
+          <!-- Mensaje de Ajuste de Saldo -->
+          <div *ngIf="adjustmentBalance() !== 0" class="mb-6 animate-in slide-in-from-top-2 duration-300">
+            <div [class]="adjustmentBalance() < 0 ? 'bg-amber-50 border-amber-100 text-amber-700' : 'bg-emerald-50 border-emerald-100 text-emerald-700'" 
+                 class="p-4 rounded-2xl border flex items-start gap-3">
+              <lucide-icon [name]="adjustmentBalance() < 0 ? 'info' : 'check-circle-2'" class="w-4 h-4 mt-0.5 shrink-0"></lucide-icon>
+              <div>
+                <p class="text-[9px] font-black uppercase tracking-widest mb-0.5">Nota de Ajuste</p>
+                <p class="text-[10px] font-medium leading-relaxed">
+                  <span *ngIf="adjustmentBalance() < 0">
+                    Se incluye un recargo de <b>S/ {{ -adjustmentBalance() | number:'1.2-2' }}</b> porque quedó un saldo pendiente de la cuota anterior.
+                  </span>
+                  <span *ngIf="adjustmentBalance() > 0">
+                    Se aplica un descuento de <b>S/ {{ adjustmentBalance() | number:'1.2-2' }}</b> por un pago excedente realizado anteriormente.
+                  </span>
+                </p>
+              </div>
+            </div>
           </div>
 
           <div class="space-y-4 mb-6">
@@ -320,14 +344,32 @@ import { FormsModule } from '@angular/forms';
             </div>
 
             <!-- Alerta de abono parcial -->
-            <div *ngIf="paymentAmount() < selectedInstallment()?.amount && paymentAmount() > 0" class="bg-amber-50 border border-amber-100 p-4 rounded-xl space-y-1">
-              <p class="text-[9px] font-black text-amber-600 uppercase tracking-tight flex items-center gap-1">
-                <lucide-icon name="info" class="w-3 h-3"></lucide-icon>
-                Abono Parcial
-              </p>
-              <p class="text-[10px] text-amber-700 font-medium leading-normal">
-                El cliente pagará un monto menor al total de la cuota. El pago se registrará, pero no se marcará como pagada hasta completar el total.
-              </p>
+            <div *ngIf="paymentAmount() < ((selectedInstallment()?.amount || 0) - adjustmentBalance()) && paymentAmount() > 0" class="bg-amber-50 border border-amber-100 p-4 rounded-xl space-y-3">
+              <div class="flex items-start gap-2">
+                <lucide-icon name="info" class="w-4 h-4 text-amber-600 mt-0.5"></lucide-icon>
+                <div>
+                  <p class="text-[9px] font-black text-amber-600 uppercase tracking-tight">Abono Parcial</p>
+                  <p class="text-[10px] text-amber-700 font-medium leading-normal">
+                    El monto es menor al total sugerido (S/ {{ (selectedInstallment()?.amount || 0) - adjustmentBalance() | number:'1.2-2' }}).
+                  </p>
+                </div>
+              </div>
+              
+              <div class="pt-2 border-t border-amber-200/50">
+                <label class="flex items-center gap-3 cursor-pointer group">
+                  <div class="relative">
+                    <input 
+                      type="checkbox" 
+                      [ngModel]="forceCompletion()" 
+                      (ngModelChange)="forceCompletion.set($event)"
+                      class="peer sr-only"
+                    >
+                    <div class="w-8 h-4 bg-amber-200 rounded-full peer peer-checked:bg-emerald-500 transition-all"></div>
+                    <div class="absolute left-1 top-1 w-2 h-2 bg-white rounded-full peer-checked:translate-x-4 transition-all"></div>
+                  </div>
+                  <span class="text-[9px] font-black text-slate-700 uppercase tracking-widest group-hover:text-emerald-600 transition-colors">Completar cuota y pasar saldo a la siguiente</span>
+                </label>
+              </div>
             </div>
           </div>
 
@@ -383,6 +425,8 @@ export class LoanDetailComponent implements OnInit {
   paymentAmount = signal<number>(0);
   paymentDate = signal<string>(new Date().toISOString().split('T')[0]);
   payments = signal<any[]>([]);
+  forceCompletion = signal(false);
+  adjustmentBalance = signal<number>(0);
 
   private parseBackendDate(date: any): Date | null {
     if (!date) return null;
@@ -403,9 +447,10 @@ export class LoanDetailComponent implements OnInit {
   }
 
   progress = computed(() => {
-    const l = this.loan();
-    if (!l || !l.totalInstallments) return 0;
-    return (l.paidInstallments || 0) / l.totalInstallments;
+    const insts = this.installmentSchedule();
+    if (!insts.length) return 0;
+    const paidCount = insts.filter(i => i.isPaid).length;
+    return paidCount / insts.length;
   });
 
   installmentSchedule = computed(() => {
@@ -435,14 +480,21 @@ export class LoanDetailComponent implements OnInit {
         dueDate.setMonth(startDate.getMonth() + i);
       }
 
-      const payment = paymentsList[i - 1];
+      // Buscar todos los pagos que pertenecen a esta cuota específica por su nota
+      const paymentsForThisInst = paymentsList.filter(p => 
+        (p.notes || '').toLowerCase().includes(`cuota ${i}`)
+      );
+      
+      // Usamos el último pago realizado para esta cuota como referencia de fecha
+      const lastPayment = paymentsForThisInst[paymentsForThisInst.length - 1];
+      const isForcedPaid = (lastPayment && (lastPayment.notes || '').toLowerCase().includes('completada'));
 
       installments.push({
         number: i,
         dueDate: dueDate,
         amount: (l.totalToPay || 0) / (l.totalInstallments || 1),
-        isPaid: i <= (l.paidInstallments || 0),
-        realPaymentDate: payment ? this.parseBackendDate(payment.paymentDate) : null
+        isPaid: i <= (l.paidInstallments || 0) || isForcedPaid,
+        realPaymentDate: lastPayment ? this.parseBackendDate(lastPayment.paymentDate) : null
       });
     }
     return installments;
@@ -481,20 +533,23 @@ export class LoanDetailComponent implements OnInit {
 
   openPaymentModal(inst: any) {
     this.selectedInstallment.set(inst);
+    this.forceCompletion.set(false);
+    
     // Calcular monto faltante para completar esta cuota basándonos en amountPaid
     const total = this.loan()?.totalToPay || 0;
     const totalInstallments = this.loan()?.totalInstallments || 1;
     const installmentAmount = total / totalInstallments;
     
-    const completedInstallments = this.loan()?.paidInstallments || 0;
+    // Usamos el conteo del frontend que incluye las cuotas forzadas
+    const completedInstallments = this.installmentSchedule().filter(i => i.isPaid).length;
     const expectedPaidForCompleted = completedInstallments * installmentAmount;
-    const accumulatedForNext = (this.loan()?.amountPaid || 0) - expectedPaidForCompleted;
     
-    // Si ya hay un abono parcial previo, le restamos lo que ya tiene
-    let toPay = installmentAmount;
-    if (accumulatedForNext > 0 && inst.number === completedInstallments + 1) {
-      toPay = installmentAmount - accumulatedForNext;
-    }
+    // El balance acumulado puede ser positivo (pagó de más) o negativo (pagó de menos pero se completó la cuota)
+    const currentBalance = (this.loan()?.amountPaid || 0) - expectedPaidForCompleted;
+    this.adjustmentBalance.set(parseFloat(currentBalance.toFixed(2)));
+    
+    // El monto sugerido es la cuota base menos el balance que ya traemos
+    let toPay = installmentAmount - currentBalance;
 
     // Asegurarnos de redondear a 2 decimales para evitar problemas de precisión
     this.paymentAmount.set(Math.max(0, parseFloat(toPay.toFixed(2))));
@@ -507,10 +562,13 @@ export class LoanDetailComponent implements OnInit {
     if (!l) return;
     if (this.paymentAmount() <= 0) return;
     this.isSaving.set(true);
+    
     this.loanService.registerPayment({
       loanId: l.id,
       amount: this.paymentAmount(),
-      note: `Pago de cuota ${this.selectedInstallment()?.number}`,
+      note: this.forceCompletion() 
+        ? `Pago parcial (S/ ${this.paymentAmount()}) - Cuota ${this.selectedInstallment()?.number} completada por ajuste.`
+        : `Pago de cuota ${this.selectedInstallment()?.number}`,
       paymentDate: this.paymentDate()
     }).subscribe({
       next: () => {
