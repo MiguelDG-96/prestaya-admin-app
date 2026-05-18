@@ -53,7 +53,7 @@ import { RouterModule } from '@angular/router';
         </div>
         
         <div class="flex flex-wrap items-center gap-3">
-          <div class="relative min-w-[280px] group">
+          <div class="relative min-w-[250px] group">
             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <lucide-icon name="search" class="w-4 h-4 text-slate-400 group-focus-within:text-[#7B61FF] transition-colors"></lucide-icon>
             </div>
@@ -94,7 +94,7 @@ import { RouterModule } from '@angular/router';
             </button>
             <button 
               routerLink="/loans/new"
-              class="bg-[#7B61FF] text-white px-6 py-3 rounded-xl font-black flex items-center gap-2 hover:bg-[#6349E6] hover:shadow-lg transition-all text-xs"
+              class="bg-[#7B61FF] text-white px-4 py-3 rounded-xl font-black flex items-center gap-1 hover:bg-[#6349E6] hover:shadow-lg transition-all text-xs"
             >
               <lucide-icon name="plus" class="w-4 h-4"></lucide-icon>
               Nuevo Préstamo
