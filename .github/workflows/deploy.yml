@@ -33,3 +33,9 @@ jobs:
         password: ${{ secrets.FTP_PASSWORD }}
         local-dir: ./dist/prestaya-app-admin/browser/
         server-dir: ./
+        exclude: |
+          **/*.jar
+          **/*.tar.gz
+          logs/**
+          OpenJDK*/**
+          .htaccess

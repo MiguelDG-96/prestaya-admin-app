@@ -713,10 +713,10 @@ export class LoanListComponent implements OnInit {
       if (!matchesTerm) return false;
 
       if (day && day !== '') {
-        const dateToUse = l.dueDate ? new Date(l.dueDate) : (l.startDate ? new Date(l.startDate) : null);
+        const dateToUse = l.dueDate ? this.parseBackendDate(l.dueDate) : (l.startDate ? this.parseBackendDate(l.startDate) : null);
         if (dateToUse) {
-          // Ajustamos para comparar con getDay(): 0 = Domingo, 1 = Lunes, etc.
-          return dateToUse.getDay() === parseInt(day, 10);
+          // Ajustamos para comparar con getUTCDay(): 0 = Domingo, 1 = Lunes, etc.
+          return dateToUse.getUTCDay() === parseInt(day, 10);
         }
         return false;
       }
