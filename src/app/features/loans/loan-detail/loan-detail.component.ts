@@ -16,7 +16,8 @@ import {
   Loader2,
   Percent,
   Layers,
-  ArrowUpRight
+  ArrowUpRight,
+  Plus
 } from 'lucide-angular';
 import { LoanService } from '../../../core/services/loan.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -85,7 +86,7 @@ import { FormsModule } from '@angular/forms';
                     <div>
                       <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Cliente Titular</p>
                       <h2 class="text-2xl font-black text-slate-900 tracking-tight">{{ loan()?.clientName || loan()?.client?.name }}</h2>
-                      <p class="text-[11px] text-slate-500 font-bold mt-1 uppercase tracking-tight">Estado de Cartera • {{ loan()?.status === 'PAID' ? 'Finalizado' : 'En curso' }}</p>
+                      <p class="text-[11px] text-slate-500 font-bold mt-1 uppercase tracking-tight">Estado de Cartera • {{ isLoanFullyPaid() ? 'Finalizado' : 'En curso' }}</p>
                     </div>
                     
                     <div class="flex flex-wrap gap-3">
@@ -93,10 +94,10 @@ import { FormsModule } from '@angular/forms';
                         <lucide-icon name="wallet" class="w-4 h-4 text-[#7B61FF]"></lucide-icon>
                         Capital: S/ {{ loan()?.amount | number:'1.0-0' }}
                       </div>
-                      <div [class]="loan()?.status === 'PAID' ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 'bg-amber-500 text-white shadow-amber-500/20'"
+                      <div [class]="isLoanFullyPaid() ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 'bg-amber-500 text-white shadow-amber-500/20'"
                             class="px-5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all">
                         <div class="w-2 h-2 rounded-full bg-white animate-pulse"></div>
-                        {{ loan()?.status === 'PAID' ? 'Totalmente Pagado' : 'Pendiente de Cobro' }}
+                        {{ isLoanFullyPaid() ? 'Totalmente Pagado' : 'Pendiente de Cobro' }}
                       </div>
                     </div>
                   </div>
@@ -203,7 +204,7 @@ import { FormsModule } from '@angular/forms';
                     </div>
                     
                     <button 
-                      *ngIf="!inst.isPaid && authService.hasAuthority('PRESTAMOS_UPDATE')"
+                      *ngIf="!inst.isPaid && !isLoanFullyPaid() && authService.hasAuthority('PRESTAMOS_UPDATE')"
                       (click)="openPaymentModal(inst)"
                       class="bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase hover:bg-slate-900 transition-all shadow-lg shadow-emerald-100 active:scale-95"
                     >
@@ -211,6 +212,17 @@ import { FormsModule } from '@angular/forms';
                     </button>
                   </div>
                 </div>
+              </div>
+
+              <!-- Botón para generar cuota adicional -->
+              <div *ngIf="canCreateExtraInstallment()" class="mt-6 flex justify-center border-t border-slate-50 pt-6">
+                <button 
+                  (click)="createExtraInstallment()"
+                  class="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-[11px] uppercase hover:bg-slate-900 transition-all shadow-lg shadow-indigo-100 active:scale-95 flex items-center gap-2"
+                >
+                  <lucide-icon name="plus" class="w-4 h-4"></lucide-icon>
+                  Crear Cuota Adicional
+                </button>
               </div>
             </div>
           </div>
@@ -429,6 +441,34 @@ export class LoanDetailComponent implements OnInit {
   payments = signal<any[]>([]);
   forceCompletion = signal(false);
   adjustmentBalance = signal<number>(0);
+  extraInstallmentsCreated = signal<number>(0);
+
+  isLoanFullyPaid = computed(() => {
+    const l = this.loan();
+    if (!l) return true;
+    return l.status === 'PAID' || (l.amountPaid || 0) >= (l.totalToPay || 0) - 0.01;
+  });
+
+  canCreateExtraInstallment = computed(() => {
+    const l = this.loan();
+    if (!l) return false;
+    
+    // Si ya se pagó el total, no se puede generar más
+    if (this.isLoanFullyPaid()) return false;
+    
+    // Solo permitir si no hay cuotas pendientes (todas las cuotas actuales están pagadas)
+    const schedule = this.installmentSchedule();
+    if (schedule.length === 0) return false;
+    
+    const hasUnpaid = schedule.some(inst => !inst.isPaid);
+    return !hasUnpaid;
+  });
+
+  createExtraInstallment() {
+    if (this.canCreateExtraInstallment()) {
+      this.extraInstallmentsCreated.update(n => n + 1);
+    }
+  }
 
   private parseBackendDate(date: any): Date | null {
     if (!date) return null;
@@ -465,11 +505,25 @@ export class LoanDetailComponent implements OnInit {
       return dateA - dateB;
     });
 
-    const installments = [];
     const startDate = this.parseBackendDate(l.startDate);
     if (!startDate) return [];
 
-    for (let i = 1; i <= (l.totalInstallments || 0); i++) {
+    // Encontrar el número máximo de cuota registrado en los pagos
+    let maxInstallmentFromPayments = l.totalInstallments || 0;
+    paymentsList.forEach(p => {
+      const match = (p.notes || '').toLowerCase().match(/cuota (\d+)/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxInstallmentFromPayments) {
+          maxInstallmentFromPayments = num;
+        }
+      }
+    });
+
+    const limit = Math.max(l.totalInstallments || 0, maxInstallmentFromPayments) + this.extraInstallmentsCreated();
+    const installments = [];
+
+    for (let i = 1; i <= limit; i++) {
       const dueDate = new Date(startDate);
       const freq = l.paymentFrequency || l.frequency;
       if (freq === 'DAILY') {
@@ -494,12 +548,29 @@ export class LoanDetailComponent implements OnInit {
       // Calcular el total abonado específicamente a esta cuota
       const totalPaidForThisInst = paymentsForThisInst.reduce((acc, p) => acc + (p.amount || 0), 0);
 
+      const isExtra = i > (l.totalInstallments || 0);
+      const baseAmount = (l.totalToPay || 0) / (l.totalInstallments || 1);
+
+      let amount = baseAmount;
+      if (isExtra) {
+        if (totalPaidForThisInst > 0) {
+          amount = totalPaidForThisInst;
+        } else {
+          amount = Math.min(baseAmount, Math.max(0, (l.totalToPay || 0) - (l.amountPaid || 0)));
+        }
+      }
+
+      const isPaid = i <= (l.paidInstallments || 0) || 
+                     isForcedPaid || 
+                     (isExtra && totalPaidForThisInst >= amount) ||
+                     ((l.amountPaid || 0) >= (l.totalToPay || 0) - 0.01);
+
       installments.push({
         number: i,
         dueDate: dueDate,
-        amount: (l.totalToPay || 0) / (l.totalInstallments || 1),
+        amount: amount,
         paidAmount: totalPaidForThisInst,
-        isPaid: i <= (l.paidInstallments || 0) || isForcedPaid,
+        isPaid: isPaid,
         realPaymentDate: lastPayment ? this.parseBackendDate(lastPayment.paymentDate) : null
       });
     }
@@ -514,6 +585,7 @@ export class LoanDetailComponent implements OnInit {
   }
 
   loadLoan(id: string) {
+    this.extraInstallmentsCreated.set(0);
     this.loanService.loadLoans().subscribe(loans => {
       const l = loans.find(x => x.id === id);
       if (l) {
@@ -538,27 +610,34 @@ export class LoanDetailComponent implements OnInit {
   }
 
   openPaymentModal(inst: any) {
+    if (this.isLoanFullyPaid()) return;
     this.selectedInstallment.set(inst);
     this.forceCompletion.set(false);
     
-    // Calcular monto faltante para completar esta cuota basándonos en amountPaid
     const total = this.loan()?.totalToPay || 0;
+    const amountPaid = this.loan()?.amountPaid || 0;
     const totalInstallments = this.loan()?.totalInstallments || 1;
     const installmentAmount = total / totalInstallments;
     
-    // Usamos el conteo del frontend que incluye las cuotas forzadas
-    const completedInstallments = this.installmentSchedule().filter(i => i.isPaid).length;
-    const expectedPaidForCompleted = completedInstallments * installmentAmount;
-    
-    // El balance acumulado puede ser positivo (pagó de más) o negativo (pagó de menos pero se completó la cuota)
-    const currentBalance = (this.loan()?.amountPaid || 0) - expectedPaidForCompleted;
-    this.adjustmentBalance.set(parseFloat(currentBalance.toFixed(2)));
-    
-    // El monto sugerido es la cuota base menos el balance que ya traemos
-    let toPay = installmentAmount - currentBalance;
-
-    // Asegurarnos de redondear a 2 decimales para evitar problemas de precisión
-    this.paymentAmount.set(Math.max(0, parseFloat(toPay.toFixed(2))));
+    if (inst.number > totalInstallments) {
+      // Es una cuota adicional
+      const remainingBalance = Math.max(0, total - amountPaid);
+      this.adjustmentBalance.set(0);
+      this.paymentAmount.set(parseFloat(Math.min(installmentAmount, remainingBalance).toFixed(2)));
+    } else {
+      // Calcular monto faltante para completar esta cuota basándonos en amountPaid
+      // Usamos el conteo del frontend que incluye las cuotas forzadas
+      const completedInstallments = this.installmentSchedule().filter(i => i.isPaid).length;
+      const expectedPaidForCompleted = completedInstallments * installmentAmount;
+      
+      // El balance acumulado puede ser positivo (pagó de más) o negativo (pagó de menos pero se completó la cuota)
+      const currentBalance = amountPaid - expectedPaidForCompleted;
+      this.adjustmentBalance.set(parseFloat(currentBalance.toFixed(2)));
+      
+      // El monto sugerido es la cuota base menos el balance que ya traemos
+      let toPay = installmentAmount - currentBalance;
+      this.paymentAmount.set(Math.max(0, parseFloat(toPay.toFixed(2))));
+    }
     this.paymentDate.set(new Date().toISOString().split('T')[0]);
     this.showPaymentModal.set(true);
   }
