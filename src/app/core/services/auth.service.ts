@@ -35,13 +35,25 @@ export class AuthService {
 
   private setSession(response: AuthResponse): void {
     localStorage.setItem('auth_token', response.token);
+    if (response.refreshToken) {
+      localStorage.setItem('refresh_token', response.refreshToken);
+    }
     localStorage.setItem('user_data', JSON.stringify(response));
     const user = AuthMapper.fromResponse(response);
     this.currentUser.set(user);
   }
 
+  refreshToken(refreshToken: string): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/auth/refresh`, { refreshToken }).pipe(
+      tap((response) => {
+        this.setSession(response);
+      })
+    );
+  }
+
   logout(): void {
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_data');
     this.currentUser.set(null);
     this.router.navigate(['/login']);
