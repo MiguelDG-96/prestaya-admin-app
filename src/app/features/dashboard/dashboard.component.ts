@@ -74,23 +74,32 @@ import { LoanService } from '../../core/services/loan.service';
           <div class="relative z-10">
             <p class="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Cartera Total</p>
             <h3 class="text-3xl font-black tracking-tight">S/ {{ overallStats()?.total_portfolio || 0 | number:'1.0-0' }}</h3>
-            <p class="text-xs text-white/60 mt-4 font-bold">Capital + Interés por cobrar</p>
+            <div class="flex items-center gap-4 mt-4 bg-white/10 rounded-xl p-3 backdrop-blur-sm">
+               <div class="flex-1 border-r border-white/20 pr-4">
+                 <p class="text-[9px] text-white/60 font-black uppercase tracking-widest">Capital</p>
+                 <p class="text-sm font-black text-white">S/ {{ overallStats()?.total_capital || calculatedCapital() | number:'1.0-0' }}</p>
+               </div>
+               <div class="flex-1 pl-2">
+                 <p class="text-[9px] text-white/60 font-black uppercase tracking-widest">Interés</p>
+                 <p class="text-sm font-black text-white">S/ {{ overallStats()?.total_interest || calculatedInterest() | number:'1.0-0' }}</p>
+               </div>
+            </div>
           </div>
         </div>
 
-        <!-- Recaudación Hoy (Orange Card) -->
+        <!-- Mensual Cobrado (Orange Card) -->
         <div class="bg-orange-500 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-orange-500/20 relative overflow-hidden group">
           <lucide-icon name="calendar" class="w-32 h-32 absolute -right-6 -bottom-6 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-700"></lucide-icon>
           <div class="flex items-center justify-between mb-8 relative z-10">
             <div class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center">
               <lucide-icon name="calendar" class="w-6 h-6"></lucide-icon>
             </div>
-            <span class="text-[9px] font-black bg-white/20 px-2 py-1 rounded-lg uppercase tracking-widest">Prioridad</span>
+            <span class="text-[9px] font-black bg-white/20 px-2 py-1 rounded-lg uppercase tracking-widest">Mes Actual</span>
           </div>
           <div class="relative z-10">
-            <p class="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Cobros Hoy</p>
-            <h3 class="text-3xl font-black tracking-tight">S/ {{ dailyStats()?.today || 0 | number:'1.0-0' }}</h3>
-            <p class="text-xs text-white/60 mt-4 font-bold">Crecimiento: {{ dailyStats()?.growth || 0 | number:'1.1-1' }}%</p>
+            <p class="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Mensual Cobrado</p>
+            <h3 class="text-3xl font-black tracking-tight">S/ {{ currentMonthTotal() || 0 | number:'1.0-0' }}</h3>
+            <p class="text-xs text-white/60 mt-4 font-bold">Acumulado del mes</p>
           </div>
         </div>
 
@@ -256,6 +265,21 @@ export class DashboardComponent implements OnInit {
       return stats[currentMonth].paid || 0;
     }
     return 0;
+  });
+
+  calculatedCapital = computed(() => {
+    return this.loanService.loans()
+      .filter(l => l.status === 'ACTIVE' || l.status === 'ACTIVO')
+      .reduce((acc, loan) => acc + (loan.amount || 0), 0);
+  });
+
+  calculatedInterest = computed(() => {
+    return this.loanService.loans()
+      .filter(l => l.status === 'ACTIVE' || l.status === 'ACTIVO')
+      .reduce((acc, loan) => {
+        const interestRate = loan.interestRate || 0;
+        return acc + (loan.amount * (interestRate / 100));
+      }, 0);
   });
 
   ngOnInit() {
