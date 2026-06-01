@@ -268,18 +268,53 @@ export class DashboardComponent implements OnInit {
   });
 
   calculatedCapital = computed(() => {
-    return this.loanService.loans()
-      .filter(l => l.status === 'ACTIVE' || l.status === 'ACTIVO')
-      .reduce((acc, loan) => acc + (loan.amount || 0), 0);
+    const loans = this.loanService.loans().filter(l => l.status !== 'PAID' && l.status !== 'CANCELLED');
+    let totalCapital = 0;
+    let totalLoansRemaining = 0;
+    
+    for (const l of loans) {
+      const totalToPay = l.totalToPay || 0;
+      const amountPaid = l.amountPaid || 0;
+      const remaining = totalToPay - amountPaid;
+      
+      if (remaining > 0) {
+        totalLoansRemaining += remaining;
+        if (totalToPay > 0) {
+          const amount = l.amount || 0;
+          const capitalRatio = amount / totalToPay;
+          totalCapital += remaining * capitalRatio;
+        }
+      }
+    }
+    
+    // Los alquileres también suman a la cartera total, asumimos que son 100% capital
+    const stats = this.overallStats();
+    if (stats && stats.total_portfolio) {
+       const rentalRemaining = stats.total_portfolio - totalLoansRemaining;
+       if (rentalRemaining > 0) {
+           totalCapital += rentalRemaining;
+       }
+    }
+
+    return totalCapital;
   });
 
   calculatedInterest = computed(() => {
-    return this.loanService.loans()
-      .filter(l => l.status === 'ACTIVE' || l.status === 'ACTIVO')
-      .reduce((acc, loan) => {
-        const interestRate = loan.interestRate || 0;
-        return acc + (loan.amount * (interestRate / 100));
-      }, 0);
+    const loans = this.loanService.loans().filter(l => l.status !== 'PAID' && l.status !== 'CANCELLED');
+    let totalInterest = 0;
+    
+    for (const l of loans) {
+      const totalToPay = l.totalToPay || 0;
+      const amountPaid = l.amountPaid || 0;
+      const remaining = totalToPay - amountPaid;
+      
+      if (totalToPay > 0 && remaining > 0) {
+        const amount = l.amount || 0;
+        const capitalRatio = amount / totalToPay;
+        totalInterest += remaining * (1 - capitalRatio);
+      }
+    }
+    return totalInterest;
   });
 
   ngOnInit() {

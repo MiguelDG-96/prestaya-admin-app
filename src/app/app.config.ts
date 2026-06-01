@@ -2,9 +2,9 @@ import { ApplicationConfig, provideZoneChangeDetection, importProvidersFrom, LOC
 import { provideRouter } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { registerLocaleData } from '@angular/common';
-import localeEs from '@angular/common/locales/es';
+import localeEsPe from '@angular/common/locales/es-PE';
 
-registerLocaleData(localeEs);
+registerLocaleData(localeEsPe);
 
 import { 
   LucideAngularModule, 
@@ -70,7 +70,7 @@ import { authInterceptor } from './core/interceptors/auth.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    { provide: LOCALE_ID, useValue: 'es' },
+    { provide: LOCALE_ID, useValue: 'es-PE' },
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideHttpClient(withInterceptors([authInterceptor])),
