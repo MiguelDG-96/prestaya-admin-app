@@ -1,0 +1,354 @@
+<div class="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans pb-12">
+    <!-- Header Section -->
+    <div
+        class="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+        <div class="flex items-center gap-4">
+            <div
+                class="w-12 h-12 bg-[#7B61FF] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-[#7B61FF]/10 shrink-0">
+                <lucide-icon name="trending-up" class="w-6 h-6"></lucide-icon>
+            </div>
+            <div>
+                <h1 class="text-2xl font-black text-slate-900 tracking-tight">¡Bienvenido, {{
+                    (authService.currentUser()?.name || '').split(' ')[0] }}! 👋</h1>
+                <p class="text-xs text-slate-500 font-medium">Este es el resumen operativo de hoy.</p>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+            <div class="relative min-w-[280px] group hidden md:block">
+                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <lucide-icon name="search"
+                        class="w-4 h-4 text-slate-400 group-focus-within:text-[#7B61FF] transition-colors"></lucide-icon>
+                </div>
+                <input type="text" placeholder="Buscar préstamo..."
+                    class="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-11 pr-4 py-3.5 font-bold text-slate-900 focus:ring-4 focus:ring-[#7B61FF]/10 focus:border-[#7B61FF] focus:bg-white transition-all outline-none text-[11px] shadow-sm">
+            </div>
+            
+            <div class="relative filter-container">
+                <button (click)="toggleFilter()"
+                    class="w-12 h-12 flex items-center justify-center rounded-2xl bg-white text-slate-400 hover:bg-[#7B61FF]/5 hover:text-[#7B61FF] transition-all border border-slate-100 shadow-sm"
+                    [class.bg-[#7B61FF]/10]="isFilterOpen()"
+                    [class.text-[#7B61FF]]="isFilterOpen()"
+                    [class.ring-4]="isFilterOpen()"
+                    [class.ring-[#7B61FF]/10]="isFilterOpen()">
+                    <lucide-icon name="filter" class="w-5 h-5"></lucide-icon>
+                </button>
+
+                <!-- Dropdown Menu -->
+                <div *ngIf="isFilterOpen()"
+                    class="absolute right-0 mt-3 w-[320px] bg-white/95 backdrop-blur-xl rounded-[2rem] shadow-2xl shadow-slate-300/40 border border-white p-5 z-50 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                    <div class="flex items-center justify-between mb-5 px-1">
+                        <div>
+                            <h4 class="text-sm font-black text-slate-900 tracking-tight">Periodo</h4>
+                            <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Filtro de cartera</p>
+                        </div>
+                        <button (click)="selectMonth(-1)"
+                            [class.bg-[#7B61FF]]="selectedMonth() === -1"
+                            [class.text-white]="selectedMonth() === -1"
+                            [class.bg-slate-100]="selectedMonth() !== -1"
+                            [class.text-slate-500]="selectedMonth() !== -1"
+                            class="text-[9px] font-black uppercase tracking-widest px-3 py-2 rounded-xl transition-all hover:bg-[#7B61FF] hover:text-white hover:shadow-lg hover:shadow-[#7B61FF]/30 active:scale-95">
+                            Global
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-3 gap-2">
+                        <ng-container *ngFor="let m of months">
+                            <button *ngIf="m.value !== -1"
+                                (click)="selectMonth(m.value)"
+                                [class.bg-[#7B61FF]]="selectedMonth() === m.value"
+                                [class.text-white]="selectedMonth() === m.value"
+                                [class.shadow-xl]="selectedMonth() === m.value"
+                                [class.shadow-[#7B61FF]/30]="selectedMonth() === m.value"
+                                [class.scale-105]="selectedMonth() === m.value"
+                                [class.bg-slate-50]="selectedMonth() !== m.value"
+                                [class.text-slate-500]="selectedMonth() !== m.value"
+                                class="py-3 px-2 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 hover:bg-slate-100 hover:text-slate-900 active:scale-95 border border-transparent hover:border-slate-200"
+                                [class.border-white]="selectedMonth() === m.value">
+                                {{ m.label | slice:0:3 }}
+                            </button>
+                        </ng-container>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Stats Carousel/Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <!-- Cartera Total (Primary Card) -->
+        <div
+            class="bg-[#7B61FF] p-8 rounded-[2.5rem] text-white shadow-2xl shadow-[#7B61FF]/30 relative overflow-hidden group">
+            
+            <!-- Info Overlay -->
+            <div *ngIf="activeTooltip() === 'cartera'" 
+                 class="absolute inset-0 bg-[#6349E6]/95 backdrop-blur-xl z-50 p-8 flex flex-col items-center justify-center text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
+                 <button (click)="activeTooltip.set(null); $event.stopPropagation()" class="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-colors tooltip-trigger">
+                     <lucide-icon name="x" class="w-4 h-4 text-white"></lucide-icon>
+                 </button>
+                 <lucide-icon name="wallet" class="w-8 h-8 text-white mb-3"></lucide-icon>
+                 <h4 class="text-white font-black text-sm uppercase tracking-widest mb-2">Cartera Total</h4>
+                 <p class="text-white/90 text-xs leading-relaxed font-bold">Representa el total del dinero en movimiento. Suma el capital otorgado y el interés proyectado, ajustándose según el mes seleccionado.</p>
+            </div>
+
+            <lucide-icon name="wallet"
+                class="w-32 h-32 absolute -right-6 -bottom-6 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-700"></lucide-icon>
+            <div class="flex items-center justify-between mb-8 relative z-20">
+                <div class="relative tooltip-trigger">
+                    <div (click)="toggleTooltip('cartera', $event)" 
+                         class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center cursor-pointer hover:bg-white/30 transition-colors">
+                        <lucide-icon name="wallet" class="w-6 h-6"></lucide-icon>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <span class="text-[9px] font-black bg-white/20 px-2 py-1 rounded-lg uppercase">{{ selectedMonthLabel() }}</span>
+                    <span class="text-[9px] font-black bg-white/20 px-2 py-1 rounded-lg uppercase">Resumen</span>
+                </div>
+            </div>
+            <div class="relative z-10">
+                <p class="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">
+                    {{ selectedMonth() === -1 ? 'Cartera Total' : 'Total Mes' }}
+                </p>
+                <h3 class="text-3xl font-black tracking-tight">S/ {{ calculatedCapital() + calculatedInterest() | number:'1.0-0' }}</h3>
+                <div class="flex items-center gap-4 mt-4 bg-white/10 rounded-xl p-3 backdrop-blur-sm">
+                    <div class="flex-1 border-r border-white/20 pr-4">
+                        <p class="text-[9px] text-white/60 font-black uppercase tracking-widest" title="Capital Otorgado">Cap. Otorgado</p>
+                        <p class="text-sm font-black text-white">S/ {{ calculatedCapital() | number:'1.0-0' }}</p>
+                    </div>
+                    <div class="flex-1 pl-2">
+                        <p class="text-[9px] text-white/60 font-black uppercase tracking-widest" title="Interés Recaudado">Int. Recaudado</p>
+                        <p class="text-sm font-black text-white">S/ {{ calculatedInterest() | number:'1.0-0' }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mensual Cobrado (Orange Card) -->
+        <div
+            class="bg-orange-500 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-orange-500/20 relative overflow-hidden group">
+            
+            <!-- Info Overlay -->
+            <div *ngIf="activeTooltip() === 'mensual'" 
+                 class="absolute inset-0 bg-orange-600/95 backdrop-blur-xl z-50 p-8 flex flex-col items-center justify-center text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
+                 <button (click)="activeTooltip.set(null); $event.stopPropagation()" class="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-colors tooltip-trigger">
+                     <lucide-icon name="x" class="w-4 h-4 text-white"></lucide-icon>
+                 </button>
+                 <lucide-icon name="calendar" class="w-8 h-8 text-white mb-3"></lucide-icon>
+                 <h4 class="text-white font-black text-sm uppercase tracking-widest mb-2">Mensual Cobrado</h4>
+                 <p class="text-white/90 text-xs leading-relaxed font-bold">Total de dinero real (incluye capital e interés) que ha ingresado a caja específicamente durante el mes actual.</p>
+            </div>
+
+            <lucide-icon name="calendar"
+                class="w-32 h-32 absolute -right-6 -bottom-6 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-700"></lucide-icon>
+            <div class="flex items-center justify-between mb-8 relative z-20">
+                <div class="relative tooltip-trigger">
+                    <div (click)="toggleTooltip('mensual', $event)" 
+                         class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center cursor-pointer hover:bg-white/30 transition-colors">
+                        <lucide-icon name="calendar" class="w-6 h-6"></lucide-icon>
+                    </div>
+                </div>
+                <span class="text-[9px] font-black bg-white/20 px-2 py-1 rounded-lg uppercase tracking-widest">Mes
+                    Actual</span>
+            </div>
+            <div class="relative z-10">
+                <p class="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Mensual Cobrado</p>
+                <h3 class="text-3xl font-black tracking-tight">S/ {{ currentMonthTotal() || 0 | number:'1.0-0' }}</h3>
+                <p class="text-xs text-white/60 mt-4 font-bold">Acumulado del mes</p>
+            </div>
+        </div>
+
+        <!-- Ganancia Real (Green Card) -->
+        <div
+            class="bg-emerald-600 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-emerald-600/20 relative overflow-hidden group">
+            
+            <!-- Info Overlay -->
+            <div *ngIf="activeTooltip() === 'ganancia'" 
+                 class="absolute inset-0 bg-emerald-700/95 backdrop-blur-xl z-50 p-8 flex flex-col items-center justify-center text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
+                 <button (click)="activeTooltip.set(null); $event.stopPropagation()" class="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-colors tooltip-trigger">
+                     <lucide-icon name="x" class="w-4 h-4 text-white"></lucide-icon>
+                 </button>
+                 <lucide-icon name="trending-up" class="w-8 h-8 text-white mb-3"></lucide-icon>
+                 <h4 class="text-white font-black text-sm uppercase tracking-widest mb-2">Ganancia Cobrada</h4>
+                 <p class="text-white/90 text-xs leading-relaxed font-bold">Dinero total histórico recaudado. Es el efectivo real que ya cobraste y tienes asegurado en caja de toda tu cartera.</p>
+            </div>
+
+            <lucide-icon name="trending-up"
+                class="w-32 h-32 absolute -right-6 -bottom-6 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-700"></lucide-icon>
+            <div class="flex items-center justify-between mb-8 relative z-20">
+                <div class="relative tooltip-trigger">
+                    <div (click)="toggleTooltip('ganancia', $event)" 
+                         class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center cursor-pointer hover:bg-white/30 transition-colors">
+                        <lucide-icon name="trending-up" class="w-6 h-6"></lucide-icon>
+                    </div>
+                </div>
+                <span
+                    class="text-[9px] font-black bg-white/20 px-2 py-1 rounded-lg uppercase tracking-widest">Real</span>
+            </div>
+            <div class="relative z-10">
+                <p class="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Ganancia Cobrada</p>
+                <h3 class="text-3xl font-black tracking-tight">S/ {{ overallStats()?.total_collected || 0 |
+                    number:'1.0-0' }}</h3>
+                <p class="text-xs text-white/60 mt-4 font-bold">Efectivo total en caja</p>
+            </div>
+        </div>
+
+        <!-- Riesgo/Pendiente (Rose Card) -->
+        <div
+            class="bg-rose-500 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-rose-500/20 relative overflow-hidden group">
+            
+            <!-- Info Overlay -->
+            <div *ngIf="activeTooltip() === 'recuperar'" 
+                 class="absolute inset-0 bg-rose-600/95 backdrop-blur-xl z-50 p-8 flex flex-col items-center justify-center text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
+                 <button (click)="activeTooltip.set(null); $event.stopPropagation()" class="absolute top-6 right-6 w-8 h-8 flex items-center justify-center bg-white/20 rounded-full hover:bg-white/40 transition-colors tooltip-trigger">
+                     <lucide-icon name="x" class="w-4 h-4 text-white"></lucide-icon>
+                 </button>
+                 <lucide-icon name="circle-dollar-sign" class="w-8 h-8 text-white mb-3"></lucide-icon>
+                 <h4 class="text-white font-black text-sm uppercase tracking-widest mb-2">Por Recuperar</h4>
+                 <p class="text-white/90 text-xs leading-relaxed font-bold">Dinero pendiente por cobrar de todos los préstamos activos. Indica tu meta de recuperación y el riesgo actual.</p>
+            </div>
+
+            <lucide-icon name="circle-dollar-sign"
+                class="w-32 h-32 absolute -right-6 -bottom-6 text-white/10 rotate-12 group-hover:scale-110 transition-transform duration-700"></lucide-icon>
+            <div class="flex items-center justify-between mb-8 relative z-20">
+                <div class="relative tooltip-trigger">
+                    <div (click)="toggleTooltip('recuperar', $event)" 
+                         class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center cursor-pointer hover:bg-white/30 transition-colors">
+                        <lucide-icon name="circle-dollar-sign" class="w-6 h-6"></lucide-icon>
+                    </div>
+                </div>
+                <span
+                    class="text-[9px] font-black bg-white/20 px-2 py-1 rounded-lg uppercase tracking-widest">Riesgo</span>
+            </div>
+            <div class="relative z-10">
+                <p class="text-white/60 text-[10px] font-black uppercase tracking-widest mb-1">Por Recuperar</p>
+                <h3 class="text-3xl font-black tracking-tight">S/ {{ overallStats()?.total_pending || 0 | number:'1.0-0'
+                    }}</h3>
+                <p class="text-xs text-white/60 mt-4 font-bold">Meta de recuperación mensual</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-2 space-y-8">
+            <!-- Mini Stats Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div
+                    class="bg-white p-6 rounded-3xl border border-slate-100 flex items-center gap-4 hover:shadow-lg hover:shadow-slate-100 transition-all cursor-pointer group">
+                    <div
+                        class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                        <lucide-icon name="calendar" class="w-6 h-6"></lucide-icon>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cobros Hoy</p>
+                        <p class="text-lg font-black text-emerald-600">S/ {{ dailyStats()?.today || 0 | number:'1.0-0'
+                            }}</p>
+                    </div>
+                </div>
+                <div
+                    class="bg-white p-6 rounded-3xl border border-slate-100 flex items-center gap-4 hover:shadow-lg hover:shadow-slate-100 transition-all cursor-pointer group">
+                    <div
+                        class="w-12 h-12 bg-[#7B61FF]/5 text-[#7B61FF] rounded-2xl flex items-center justify-center group-hover:bg-[#7B61FF] group-hover:text-white transition-colors">
+                        <lucide-icon name="calendar" class="w-6 h-6"></lucide-icon>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Acumulado Mes</p>
+                        <p class="text-lg font-black text-[#7B61FF]">S/ {{ currentMonthTotal() | number:'1.0-0' }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Loans styled like Flutter cards -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between mb-2 px-2">
+                    <h4 class="text-sm font-black text-slate-900 uppercase tracking-widest">Préstamos Recientes</h4>
+                    <button (click)="router.navigate(['/loans'])"
+                        class="text-xs font-bold text-slate-400 hover:text-[#7B61FF] transition-all">Ver todos</button>
+                </div>
+
+                <div *ngFor="let loan of recentLoans()"
+                    class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:shadow-xl hover:shadow-slate-100 transition-all cursor-pointer"
+                    (click)="router.navigate(['/loans', loan.id])">
+                    <div class="flex items-center gap-4">
+                        <div
+                            class="w-14 h-14 bg-[#7B61FF]/5 text-[#7B61FF] rounded-2xl flex items-center justify-center font-black text-lg group-hover:bg-[#7B61FF] group-hover:text-white transition-all">
+                            {{ (loan.clientName || loan.client?.name || 'C').charAt(0).toUpperCase() }}
+                        </div>
+                        <div>
+                            <h5 class="font-black text-slate-900 group-hover:text-[#7B61FF] transition-colors">{{
+                                loan.clientName || loan.client?.name || 'Cliente' }}</h5>
+                            <div class="flex items-center gap-2 mt-0.5">
+                                <span
+                                    class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Frecuencia:
+                                    {{ translateFrequency(loan.paymentFrequency || loan.frequency) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-lg font-black text-[#7B61FF]">S/ {{ loan.amount | number:'1.0-0' }}</p>
+                        <span
+                            class="inline-flex items-center px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 mt-1">Activo</span>
+                    </div>
+                </div>
+
+                <div *ngIf="recentLoans().length === 0"
+                    class="bg-white p-12 rounded-[2.5rem] border border-slate-100 border-dashed text-center">
+                    <div
+                        class="w-16 h-16 bg-slate-50 text-slate-300 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <lucide-icon name="wallet" class="w-8 h-8"></lucide-icon>
+                    </div>
+                    <p class="text-slate-400 font-bold">No hay préstamos recientes.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Actions & Banner -->
+        <div class="space-y-6">
+            <div
+                class="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-slate-200 relative overflow-hidden">
+                <lucide-icon name="circle-dollar-sign"
+                    class="w-32 h-32 absolute -right-6 -bottom-6 text-white/5 rotate-12"></lucide-icon>
+                <h4 class="text-xl font-black mb-8 relative z-10 tracking-tight">Acciones Rápidas</h4>
+                <div class="space-y-3 relative z-10">
+                    <button (click)="router.navigate(['/loans'])"
+                        class="w-full bg-white/5 hover:bg-white/10 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-4 px-6 border border-white/5">
+                        <lucide-icon name="circle-dollar-sign" class="w-4 h-4"></lucide-icon>
+                        Nuevo Préstamo
+                    </button>
+                    <button (click)="router.navigate(['/clients'])"
+                        class="w-full bg-white/5 hover:bg-white/10 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-4 px-6 border border-white/5">
+                        <lucide-icon name="users" class="w-4 h-4"></lucide-icon>
+                        Registrar Cliente
+                    </button>
+                    <button (click)="router.navigate(['/rentals'])"
+                        class="w-full bg-white/5 hover:bg-white/10 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-4 px-6 border border-white/5">
+                        <lucide-icon name="home" class="w-4 h-4"></lucide-icon>
+                        Gestionar Alquiler
+                    </button>
+                    <div class="pt-4">
+                        <button *ngIf="authService.hasAuthority('ROLES_VIEW')" (click)="router.navigate(['/rbac'])"
+                            class="w-full bg-white text-slate-900 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-3 px-6 shadow-xl active:scale-[0.98]">
+                            <lucide-icon name="shield-check" class="w-4 h-4"></lucide-icon>
+                            Panel de Seguridad
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                class="bg-gradient-to-br from-[#7B61FF] to-[#6349E6] p-8 rounded-[2.5rem] text-white shadow-xl shadow-[#7B61FF]/20 relative overflow-hidden cursor-pointer hover:scale-[1.02] transition-transform duration-500">
+                <lucide-icon name="trending-up"
+                    class="w-32 h-32 absolute -right-8 -bottom-8 text-white/10 rotate-12"></lucide-icon>
+                <div class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6">
+                    <lucide-icon name="trending-up" class="w-6 h-6"></lucide-icon>
+                </div>
+                <h4 class="text-xl font-black mb-2 tracking-tight">Análisis Premium</h4>
+                <p class="text-white/70 text-xs font-medium leading-relaxed">Visualiza el crecimiento de tu cartera y el
+                    estado detallado de tus cobros en tiempo real.</p>
+                <div class="mt-8 flex items-center gap-2 text-white font-black text-[10px] uppercase tracking-widest">
+                    <span>Ver estadísticas</span>
+                    <lucide-icon name="arrow-right" class="w-4 h-4"></lucide-icon>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

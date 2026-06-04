@@ -71,8 +71,8 @@ import { NotificationService } from '../../../core/services/notification.service
               <h4 [class.font-black]="!n.isRead" [class.font-bold]="n.isRead" class="text-slate-900 text-sm leading-tight mb-1">{{ n.title }}</h4>
               <p class="text-xs text-slate-500 font-medium line-clamp-2">{{ n.description }}</p>
               <div class="mt-3 flex items-center justify-between">
-                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">{{ n.createdAt | date:'shortTime' }}</span>
-                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">{{ n.createdAt | date:'dd MMM' }}</span>
+                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">{{ formatDate(n.createdAt) | date:'shortTime' }}</span>
+                <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">{{ formatDate(n.createdAt) | date:'dd MMM' }}</span>
               </div>
             </div>
           </div>
@@ -129,5 +129,13 @@ export class NotificationDrawerComponent {
       case 'ALERT': return 'text-rose-600';
       default: return 'text-slate-600';
     }
+  }
+
+  formatDate(dateStr: string): string {
+    if (!dateStr) return '';
+    if (dateStr.includes('T') && !dateStr.endsWith('Z') && !dateStr.match(/[+-]\d{2}:\d{2}$/)) {
+      return dateStr + 'Z';
+    }
+    return dateStr;
   }
 }
