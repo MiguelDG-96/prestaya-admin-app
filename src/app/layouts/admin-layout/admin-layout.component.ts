@@ -29,7 +29,7 @@ import { NotificationDrawerComponent } from './notification-drawer/notification-
     <div class="flex h-screen bg-slate-50 font-sans overflow-hidden">
       <!-- Sidebar -->
       <aside 
-        [class.w-64]="!isSidebarCollapsed()"
+        [class.w-56]="!isSidebarCollapsed()"
         [class.w-20]="isSidebarCollapsed()"
         [class.translate-x-0]="isMobileMenuOpen()"
         [class.-translate-x-full]="!isMobileMenuOpen() && isMobile()"
