@@ -521,11 +521,10 @@ export class LoanDetailComponent implements OnInit {
     });
 
     const limit = Math.max(l.totalInstallments || 0, maxInstallmentFromPayments) + this.extraInstallmentsCreated();
-    const installments = [];
-
-    let remainingPaidAmount = l.amountPaid || 0;
+    const installmentsMap = new Map<number, any>();
     const baseAmount = (l.totalToPay || 0) / (l.totalInstallments || 1);
 
+    // Inicializar cuotas
     for (let i = 1; i <= limit; i++) {
       const dueDate = new Date(startDate);
       const freq = l.paymentFrequency || l.frequency;
@@ -539,57 +538,94 @@ export class LoanDetailComponent implements OnInit {
         dueDate.setMonth(startDate.getMonth() + i);
       }
 
-      // Buscar todos los pagos que pertenecen a esta cuota específica por su nota (solo para referencia de fechas)
-      const paymentsForThisInst = paymentsList.filter(p => 
-        (p.notes || '').toLowerCase().includes(`cuota ${i}`)
-      );
-      
-      const lastPayment = paymentsForThisInst[paymentsForThisInst.length - 1];
-      const isForcedPaid = (lastPayment && (lastPayment.notes || '').toLowerCase().includes('completada'));
-      
+      installmentsMap.set(i, {
+        number: i,
+        dueDate: dueDate,
+        amount: baseAmount,
+        paidAmount: 0,
+        isForcedPaid: false,
+        payments: []
+      });
+    }
+
+    // Distribuir pagos en cascada empezando desde la cuota que indica su nota
+    paymentsList.forEach(p => {
+      let startIdx = 1;
+      const match = (p.notes || '').toLowerCase().match(/cuota (\d+)/);
+      if (match) {
+        startIdx = parseInt(match[1], 10);
+      }
+
+      const isForced = (p.notes || '').toLowerCase().includes('completada');
+      if (isForced && installmentsMap.has(startIdx)) {
+         installmentsMap.get(startIdx).isForcedPaid = true;
+      }
+
+      let amountToDistribute = p.amount || 0;
+      let currIdx = startIdx;
+
+      while (amountToDistribute > 0 && currIdx <= limit) {
+         let inst = installmentsMap.get(currIdx);
+         if (inst) {
+             let needed = inst.amount - inst.paidAmount;
+             if (needed > 0) {
+                // Este pago contribuye a esta cuota, así que lo guardamos para referencia de fecha
+                inst.payments.push(p);
+
+                if (amountToDistribute >= needed) {
+                   inst.paidAmount += needed;
+                   amountToDistribute -= needed;
+                } else {
+                   inst.paidAmount += amountToDistribute;
+                   amountToDistribute = 0;
+                }
+             }
+         }
+         currIdx++;
+      }
+
+      // Si sobra dinero y ya llegamos a la última cuota, el excedente se suma allí
+      if (amountToDistribute > 0 && limit > 0) {
+         let lastInst = installmentsMap.get(limit);
+         if (lastInst) {
+             lastInst.payments.push(p);
+             lastInst.paidAmount += amountToDistribute;
+         }
+      }
+    });
+
+    const result = [];
+    for (let i = 1; i <= limit; i++) {
+      const inst = installmentsMap.get(i);
       const isExtra = i > (l.totalInstallments || 0);
 
-      let amount = baseAmount;
+      // Si es una cuota extra, ajustamos su amount esperado
       if (isExtra) {
-        amount = Math.max(0, (l.totalToPay || 0) - (l.amountPaid || 0));
-        if (amount === 0 && paymentsForThisInst.length > 0) {
-            amount = paymentsForThisInst.reduce((acc, p) => acc + (p.amount || 0), 0);
-        } else if (amount === 0) {
-            amount = baseAmount;
+        if (inst.paidAmount > 0) {
+          inst.amount = inst.paidAmount;
+        } else {
+          inst.amount = Math.min(baseAmount, Math.max(0, (l.totalToPay || 0) - (l.amountPaid || 0)));
         }
       }
 
-      // Distribuir el total pagado secuencialmente
-      let appliedAmount = 0;
-      if (remainingPaidAmount >= amount) {
-          appliedAmount = amount;
-          remainingPaidAmount -= amount;
-      } else if (remainingPaidAmount > 0) {
-          appliedAmount = remainingPaidAmount;
-          remainingPaidAmount = 0;
-      }
-
-      // Si es la última cuota y sobra dinero en el pozo, se le asigna a esta última para que cuadre
-      if (i === limit && remainingPaidAmount > 0) {
-          appliedAmount += remainingPaidAmount;
-          remainingPaidAmount = 0;
-      }
-
       const isPaid = i <= (l.paidInstallments || 0) || 
-                     isForcedPaid || 
-                     (appliedAmount >= amount && amount > 0) ||
+                     inst.isForcedPaid || 
+                     (inst.paidAmount >= inst.amount - 0.01 && inst.amount > 0) ||
                      ((l.amountPaid || 0) >= (l.totalToPay || 0) - 0.01);
 
-      installments.push({
+      const lastPayment = inst.payments.length > 0 ? inst.payments[inst.payments.length - 1] : null;
+
+      result.push({
         number: i,
-        dueDate: dueDate,
-        amount: amount,
-        paidAmount: appliedAmount,
+        dueDate: inst.dueDate,
+        amount: inst.amount,
+        paidAmount: inst.paidAmount,
         isPaid: isPaid,
         realPaymentDate: lastPayment ? this.parseBackendDate(lastPayment.paymentDate) : null
       });
     }
-    return installments;
+
+    return result;
   });
 
   ngOnInit() {
