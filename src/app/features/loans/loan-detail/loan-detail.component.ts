@@ -499,7 +499,7 @@ export class LoanDetailComponent implements OnInit {
     const l = this.loan();
     if (!l || !l.startDate) return [];
 
-    const paymentsList = (this.payments() || []).sort((a, b) => {
+    const paymentsList = [...(this.payments() || [])].sort((a, b) => {
       const dateA = this.parseBackendDate(a.paymentDate)?.getTime() || 0;
       const dateB = this.parseBackendDate(b.paymentDate)?.getTime() || 0;
       return dateA - dateB;
@@ -548,7 +548,8 @@ export class LoanDetailComponent implements OnInit {
       });
     }
 
-    // Distribuir pagos en cascada empezando desde la cuota que indica su nota
+    // Mapeo estricto: el pago se asigna visualmente SOLO a la cuota que indica su nota.
+    // No se rebalsa el exceso a las siguientes cuotas visualmente.
     paymentsList.forEach(p => {
       let startIdx = 1;
       const match = (p.notes || '').toLowerCase().match(/cuota (\d+)/);
@@ -557,40 +558,14 @@ export class LoanDetailComponent implements OnInit {
       }
 
       const isForced = (p.notes || '').toLowerCase().includes('completada');
-      if (isForced && installmentsMap.has(startIdx)) {
-         installmentsMap.get(startIdx).isForcedPaid = true;
-      }
-
-      let amountToDistribute = p.amount || 0;
-      let currIdx = startIdx;
-
-      while (amountToDistribute > 0 && currIdx <= limit) {
-         let inst = installmentsMap.get(currIdx);
-         if (inst) {
-             let needed = inst.amount - inst.paidAmount;
-             if (needed > 0) {
-                // Este pago contribuye a esta cuota, así que lo guardamos para referencia de fecha
-                inst.payments.push(p);
-
-                if (amountToDistribute >= needed) {
-                   inst.paidAmount += needed;
-                   amountToDistribute -= needed;
-                } else {
-                   inst.paidAmount += amountToDistribute;
-                   amountToDistribute = 0;
-                }
-             }
+      if (installmentsMap.has(startIdx)) {
+         let inst = installmentsMap.get(startIdx);
+         if (isForced) {
+            inst.isForcedPaid = true;
          }
-         currIdx++;
-      }
-
-      // Si sobra dinero y ya llegamos a la última cuota, el excedente se suma allí
-      if (amountToDistribute > 0 && limit > 0) {
-         let lastInst = installmentsMap.get(limit);
-         if (lastInst) {
-             lastInst.payments.push(p);
-             lastInst.paidAmount += amountToDistribute;
-         }
+         // Sumar directamente todo el monto a la cuota indicada
+         inst.paidAmount += (parseFloat(p.amount as any) || 0);
+         inst.payments.push(p);
       }
     });
 
