@@ -523,6 +523,9 @@ export class LoanDetailComponent implements OnInit {
     const limit = Math.max(l.totalInstallments || 0, maxInstallmentFromPayments) + this.extraInstallmentsCreated();
     const installments = [];
 
+    let remainingPaidAmount = l.amountPaid || 0;
+    const baseAmount = (l.totalToPay || 0) / (l.totalInstallments || 1);
+
     for (let i = 1; i <= limit; i++) {
       const dueDate = new Date(startDate);
       const freq = l.paymentFrequency || l.frequency;
@@ -536,40 +539,52 @@ export class LoanDetailComponent implements OnInit {
         dueDate.setMonth(startDate.getMonth() + i);
       }
 
-      // Buscar todos los pagos que pertenecen a esta cuota específica por su nota
+      // Buscar todos los pagos que pertenecen a esta cuota específica por su nota (solo para referencia de fechas)
       const paymentsForThisInst = paymentsList.filter(p => 
         (p.notes || '').toLowerCase().includes(`cuota ${i}`)
       );
       
-      // Usamos el último pago realizado para esta cuota como referencia de fecha
       const lastPayment = paymentsForThisInst[paymentsForThisInst.length - 1];
       const isForcedPaid = (lastPayment && (lastPayment.notes || '').toLowerCase().includes('completada'));
       
-      // Calcular el total abonado específicamente a esta cuota
-      const totalPaidForThisInst = paymentsForThisInst.reduce((acc, p) => acc + (p.amount || 0), 0);
-
       const isExtra = i > (l.totalInstallments || 0);
-      const baseAmount = (l.totalToPay || 0) / (l.totalInstallments || 1);
 
       let amount = baseAmount;
       if (isExtra) {
-        if (totalPaidForThisInst > 0) {
-          amount = totalPaidForThisInst;
-        } else {
-          amount = Math.min(baseAmount, Math.max(0, (l.totalToPay || 0) - (l.amountPaid || 0)));
+        amount = Math.max(0, (l.totalToPay || 0) - (l.amountPaid || 0));
+        if (amount === 0 && paymentsForThisInst.length > 0) {
+            amount = paymentsForThisInst.reduce((acc, p) => acc + (p.amount || 0), 0);
+        } else if (amount === 0) {
+            amount = baseAmount;
         }
+      }
+
+      // Distribuir el total pagado secuencialmente
+      let appliedAmount = 0;
+      if (remainingPaidAmount >= amount) {
+          appliedAmount = amount;
+          remainingPaidAmount -= amount;
+      } else if (remainingPaidAmount > 0) {
+          appliedAmount = remainingPaidAmount;
+          remainingPaidAmount = 0;
+      }
+
+      // Si es la última cuota y sobra dinero en el pozo, se le asigna a esta última para que cuadre
+      if (i === limit && remainingPaidAmount > 0) {
+          appliedAmount += remainingPaidAmount;
+          remainingPaidAmount = 0;
       }
 
       const isPaid = i <= (l.paidInstallments || 0) || 
                      isForcedPaid || 
-                     (isExtra && totalPaidForThisInst >= amount) ||
+                     (appliedAmount >= amount && amount > 0) ||
                      ((l.amountPaid || 0) >= (l.totalToPay || 0) - 0.01);
 
       installments.push({
         number: i,
         dueDate: dueDate,
         amount: amount,
-        paidAmount: totalPaidForThisInst,
+        paidAmount: appliedAmount,
         isPaid: isPaid,
         realPaymentDate: lastPayment ? this.parseBackendDate(lastPayment.paymentDate) : null
       });
