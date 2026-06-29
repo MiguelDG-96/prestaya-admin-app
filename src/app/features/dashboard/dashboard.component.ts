@@ -80,45 +80,27 @@ export class DashboardComponent implements OnInit {
   });
 
   calculatedCapital = computed(() => {
-    const loans = this.loanService.loans();
     const month = this.selectedMonth();
-    let totalCapitalOtorgado = 0;
-    
-    for (const l of loans) {
-      if (month !== -1) {
-        if (!l.startDate) continue;
-        const loanMonth = new Date(l.startDate).getMonth();
-        if (loanMonth !== month) continue;
-      }
-      totalCapitalOtorgado += l.amount || 0;
+    if (month === -1) {
+      return this.overallStats()?.capital_otorgado || 0;
     }
-
-    return totalCapitalOtorgado;
+    const stats = this.monthlyStats();
+    if (stats && stats[month]) {
+      return stats[month].capital_otorgado || 0;
+    }
+    return 0;
   });
 
   calculatedInterest = computed(() => {
-    const loans = this.loanService.loans();
     const month = this.selectedMonth();
-    let totalInteresRecaudado = 0;
-    
-    for (const l of loans) {
-      if (month !== -1) {
-        if (!l.startDate) continue;
-        const loanMonth = new Date(l.startDate).getMonth();
-        if (loanMonth !== month) continue;
-      }
-      
-      const totalToPay = l.totalToPay || 0;
-      const amountPaid = l.amountPaid || 0;
-      const amount = l.amount || 0;
-      
-      if (totalToPay > 0 && amountPaid > 0) {
-        const capitalRatio = amount / totalToPay;
-        const interestRatio = 1 - capitalRatio;
-        totalInteresRecaudado += amountPaid * interestRatio;
-      }
+    if (month === -1) {
+      return this.overallStats()?.interes_recaudado || 0;
     }
-    return totalInteresRecaudado;
+    const stats = this.monthlyStats();
+    if (stats && stats[month]) {
+      return stats[month].interes_recaudado || 0;
+    }
+    return 0;
   });
 
   ngOnInit() {
