@@ -62,7 +62,8 @@ import {
   Percent,
   Banknote,
   Filter,
-  Bookmark
+  Bookmark,
+  Camera
 } from 'lucide-angular';
 
 import { routes } from './app.routes';
@@ -130,7 +131,8 @@ export const appConfig: ApplicationConfig = {
         Percent,
         Banknote,
         Filter,
-        Bookmark
+        Bookmark,
+        Camera
       })
     )
   ],

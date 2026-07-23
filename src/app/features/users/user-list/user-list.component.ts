@@ -11,7 +11,8 @@ import {
   Search, 
   Loader2,
   Trash2,
-  Lock
+  Lock,
+  Camera
 } from 'lucide-angular';
 import { AuthService } from '../../../core/services/auth.service';
 import { HttpClient } from '@angular/common/http';
@@ -70,9 +71,15 @@ import { Rol } from '../../../core/models/rbac.model';
           </div>
 
           <div class="flex items-center gap-4 mb-6">
-            <div class="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 border border-slate-100 shadow-sm overflow-hidden group-hover:border-[#7B61FF]/20 transition-all">
+            <div class="relative w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 border border-slate-100 shadow-sm overflow-hidden group-hover:border-[#7B61FF]/20 transition-all">
               <img *ngIf="user.photoUrl" [src]="getFullPhotoUrl(user.photoUrl)" class="w-full h-full object-cover">
               <lucide-icon *ngIf="!user.photoUrl" name="user" class="w-8 h-8"></lucide-icon>
+              
+              <!-- Hover Overlay for Photo Upload -->
+              <label class="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                <lucide-icon name="camera" class="w-5 h-5 mb-0.5"></lucide-icon>
+                <input type="file" class="hidden" accept="image/*" (change)="uploadPhoto(user.id, $event)">
+              </label>
             </div>
             <div>
               <h3 class="font-black text-slate-900 leading-tight tracking-tight">{{ user.name }}</h3>
@@ -298,6 +305,28 @@ export class UserListComponent implements OnInit {
 
   loadRoles() {
     this.http.get<Rol[]>(`${this.apiUrl}/roles-management/roles`).subscribe(data => this.roles.set(data));
+  }
+
+  uploadPhoto(userId: string, event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+      const formData = new FormData();
+      formData.append('userId', userId);
+      formData.append('file', file);
+      
+      this.http.post(`${this.apiUrl}/users/photo`, formData).subscribe({
+        next: (response: any) => {
+          const currentUsers = this.users();
+          const userIndex = currentUsers.findIndex(u => u.id === userId);
+          if (userIndex !== -1) {
+            currentUsers[userIndex].photoUrl = response.photoUrl;
+            this.users.set([...currentUsers]);
+          }
+        },
+        error: (err) => console.error('Error al subir foto:', err)
+      });
+    }
   }
 
   saveUser() {
