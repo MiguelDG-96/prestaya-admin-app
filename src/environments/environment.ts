@@ -1,4 +1,4 @@
 export const environment = {
   production: false,
-  apiUrl: 'https://servicio.teamrecios.com/api',
+  apiUrl: 'https://presta.infiny-capital.com/api',
 };
