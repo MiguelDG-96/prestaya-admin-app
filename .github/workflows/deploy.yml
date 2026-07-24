@@ -1,4 +1,4 @@
-name: Deploy via FTP
+name: Deploy via SSH
 
 on:
   push:
@@ -25,17 +25,14 @@ jobs:
     - name: Build project
       run: npm run build
 
-    - name: FTP Deploy
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+    - name: Deploy via SSH
+      uses: appleboy/scp-action@v0.1.7
       with:
-        server: ${{ secrets.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME }}
-        password: ${{ secrets.FTP_PASSWORD }}
-        local-dir: ./dist/prestaya-app-admin/browser/
-        server-dir: ./
-        exclude: |
-          **/*.jar
-          **/*.tar.gz
-          logs/**
-          OpenJDK*/**
-          .htaccess
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        passphrase: ${{ secrets.SSH_PASSPHRASE }}
+        source: "dist/prestaya-app-admin/browser/**"
+        target: "/home/infiny/presta.infiny-capital.com"
+        strip_components: 3
+
