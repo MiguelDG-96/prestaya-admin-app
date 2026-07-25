@@ -8,9 +8,8 @@
   # Evitar que Apache redirija automáticamente añadiendo una barra inclinada a carpetas reales (ej. /login -> /login/)
   DirectorySlash Off
 
-  # Si la petición es para la API (backend), no la reescribas a index.html
-  RewriteCond %{REQUEST_URI} ^/api/ [NC]
-  RewriteRule ^ - [L]
+  # Redirigir (Proxy) las peticiones de la API al backend en Spring Boot (puerto 8080)
+  RewriteRule ^api/(.*)$ http://127.0.0.1:8080/api/$1 [P,L]
 
   # Si la petición es para archivos subidos físicamente (uploads), no la reescribas
   RewriteCond %{REQUEST_URI} ^/uploads/ [NC]
