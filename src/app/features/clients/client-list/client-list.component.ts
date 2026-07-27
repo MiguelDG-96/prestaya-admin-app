@@ -249,7 +249,7 @@ import { ClientCreateRequest, Client } from '../../../core/models/client.model';
                   <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                     <lucide-icon name="mail" class="w-4 h-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors"></lucide-icon>
                   </div>
-                  <input type="email" [(ngModel)]="newClient.email" (blur)="onEmailChange()" name="email" required class="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-slate-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 focus:bg-white transition-all outline-none text-xs" [class.ring-4]="errors().email" [class.ring-rose-500/10]="errors().email" [class.border-rose-500]="errors().email">
+                  <input type="email" [(ngModel)]="newClient.email" (blur)="onEmailChange()" name="email" class="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-4 py-3.5 font-bold text-slate-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 focus:bg-white transition-all outline-none text-xs" [class.ring-4]="errors().email" [class.ring-rose-500/10]="errors().email" [class.border-rose-500]="errors().email">
                 </div>
                 <p *ngIf="errors().email" class="text-[10px] text-rose-500 font-bold mt-1 ml-1">{{ errors().email }}</p>
               </div>
@@ -428,7 +428,7 @@ export class ClientListComponent implements OnInit {
     if (!this.newClient.name) errs.name = "El nombre es requerido";
     if (!dniRegex.test(this.newClient.dni)) errs.dni = "DNI debe tener 8 números";
     if (!phoneRegex.test(this.newClient.phone)) errs.phone = "Celular debe tener 9 números";
-    if (!emailRegex.test(this.newClient.email)) errs.email = "Correo electrónico inválido";
+    if (this.newClient.email && !emailRegex.test(this.newClient.email)) errs.email = "Correo electrónico inválido";
     
     this.errors.set(errs);
     return Object.keys(errs).length === 0;
@@ -460,6 +460,9 @@ export class ClientListComponent implements OnInit {
           this.errors.set(rest);
         }
       });
+    } else if (!email) {
+      const { email, ...rest } = this.errors();
+      this.errors.set(rest);
     }
   }
 

@@ -293,7 +293,7 @@ import { LoanCreateRequest } from '../../../core/models/loan.model';
                 </div>
                 <div>
                   <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Email</label>
-                  <input type="email" [(ngModel)]="newQuickClient.email" name="quickEmail" required class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-emerald-600 focus:bg-white transition-all">
+                  <input type="email" [(ngModel)]="newQuickClient.email" name="quickEmail" class="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-black outline-none focus:border-emerald-600 focus:bg-white transition-all">
                 </div>
                 <div class="col-span-2">
                   <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Dirección</label>
